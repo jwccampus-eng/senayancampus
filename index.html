@@ -1,0 +1,3456 @@
+<!DOCTYPE html>
+<html lang="en" data-lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<script>
+(function(){
+  var root = document.documentElement;
+  var theme = 'light'; /* default theme; only an explicit "dark" choice overrides it */
+  try{
+    var v = localStorage.getItem('dp_theme');
+    if(v && JSON.parse(v) === 'dark') theme = 'dark';
+  }catch(e){}
+  root.setAttribute('data-theme', theme);
+  /* A phone that scanned the check-in QR opens this file with ?checkin=<id> */
+  if(/[?&]checkin(=|&|$)/.test(location.search)) root.setAttribute('data-mode', 'attendee');
+})();
+</script>
+<title>Lucky Draw — Doorprize</title>
+<meta name="description" content="Bilingual live doorprize / lucky draw display for events">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700;9..144,900&family=Inter:wght@400;500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+/* ============================================================
+   DESIGN TOKENS
+   ============================================================ */
+:root{
+  --ink:        #0A0E1F;
+  --ink-2:      #121A36;
+  --ink-3:      #1B2547;
+  --ink-4:      #232E56;
+  --velvet:     #2C1458;
+  --gold:       #F4B740;
+  --gold-2:     #FFDD8A;
+  --gold-dim:   #B9862A;
+  --ember:      #FF6B4A;
+  --ember-2:    #FF8F6B;
+  --mint:       #37E0B0;
+  --mint-2:     #7CF0CD;
+  --paper:      #F6F3EA;
+  --dim:        #9AA2C7;
+  --dim-2:      #5B6389;
+  --on-accent:  #221302;
+  --line:       rgba(246,243,234,0.14);
+  --line-soft:  rgba(246,243,234,0.08);
+  --shadow-gold:  0 0 50px rgba(244,183,64,.30);
+  --shadow-ember: 0 0 50px rgba(255,107,74,.35);
+  --shadow-mint:  0 0 40px rgba(55,224,176,.30);
+  --radius-xl: 32px;
+  --radius-lg: 24px;
+  --radius-md: 16px;
+  --radius-sm: 10px;
+  --font-display: 'Fraunces', Georgia, 'Times New Roman', serif;
+  --font-body: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Consolas', 'SFMono-Regular', monospace;
+  --ease-out: cubic-bezier(.16,1,.3,1);
+  --ease-spring: cubic-bezier(.34,1.56,.64,1);
+}
+
+/* ============================================================
+   LIGHT THEME OVERRIDES
+   ============================================================ */
+[data-theme="light"]{
+  --ink:        #F5EFE2;
+  --ink-2:      #FFFFFF;
+  --ink-3:      #FFFFFF;
+  --ink-4:      #E9E0CB;
+  --velvet:     #EAE0FB;
+  --gold:       #E2960F;
+  --gold-2:     #C97A00;
+  --gold-dim:   #A9720B;
+  --ember:      #E1552F;
+  --ember-2:    #C7431F;
+  --mint:       #0E9C77;
+  --mint-2:     #0B7F60;
+  --paper:      #201A3D;
+  --dim:        #5C6088;
+  --dim-2:      #8B8FB0;
+  --line:       rgba(32,26,61,0.14);
+  --line-soft:  rgba(32,26,61,0.07);
+  --shadow-gold:  0 0 40px rgba(217,142,15,.22);
+  --shadow-ember: 0 0 40px rgba(225,85,47,.22);
+  --shadow-mint:  0 0 34px rgba(14,156,119,.20);
+}
+[data-theme="light"] body{
+  background:
+    radial-gradient(1100px 620px at 18% -10%, rgba(234,224,251,.65), transparent 60%),
+    radial-gradient(900px 560px at 108% 10%, rgba(226,150,15,.10), transparent 55%),
+    radial-gradient(1200px 800px at 50% 120%, rgba(14,156,119,.07), transparent 60%),
+    var(--ink);
+}
+[data-theme="light"] body::before{
+  background: radial-gradient(1400px 900px at 50% 40%, transparent 55%, rgba(32,26,61,.06) 100%);
+}
+[data-theme="light"] .ticket-board,
+[data-theme="light"] .drawer,
+[data-theme="light"] .tally,
+[data-theme="light"] .reveal-card{
+  box-shadow: 0 20px 60px -24px rgba(32,26,61,.20), inset 0 1px 0 rgba(255,255,255,.6);
+}
+[data-theme="light"] .draw-btn,
+[data-theme="light"] .btn-gold{
+  box-shadow: 0 16px 32px -12px rgba(217,142,15,.38);
+}
+
+*{box-sizing:border-box;}
+html,body{height:100%;}
+body{
+  margin:0;
+  min-height:100vh;
+  background:
+    radial-gradient(1100px 620px at 18% -10%, rgba(44,20,88,.55), transparent 60%),
+    radial-gradient(900px 560px at 108% 10%, rgba(244,183,64,.10), transparent 55%),
+    radial-gradient(1200px 800px at 50% 120%, rgba(55,224,176,.06), transparent 60%),
+    var(--ink);
+  color:var(--paper);
+  font-family:var(--font-body);
+  overflow-x:hidden;
+}
+h1,h2,h3,.font-display{font-family:var(--font-display);}
+.font-mono{font-family:var(--font-mono);}
+button{font-family:inherit;}
+::selection{background:var(--gold);color:var(--on-accent);}
+
+/* subtle noise/vignette layer for stage depth */
+body::before{
+  content:"";
+  position:fixed; inset:0; pointer-events:none; z-index:0;
+  background: radial-gradient(1400px 900px at 50% 40%, transparent 40%, rgba(0,0,0,.45) 100%);
+}
+
+::-webkit-scrollbar{width:10px;height:10px;}
+::-webkit-scrollbar-track{background:transparent;}
+::-webkit-scrollbar-thumb{background:var(--ink-4);border-radius:10px;}
+::-webkit-scrollbar-thumb:hover{background:var(--dim-2);}
+
+.visually-hidden{position:absolute!important;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap;}
+
+/* ============================================================
+   APP SHELL
+   ============================================================ */
+#app-root{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column;}
+
+#bgImageLayer{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background-size:cover; background-position:center; background-repeat:no-repeat;
+  opacity:0; transition:opacity .3s var(--ease-out);
+}
+#bgImageLayer.active{opacity:1;}
+#bgScrim{
+  position:fixed; inset:0; z-index:0; pointer-events:none;
+  background:rgba(6,9,20,.58);
+  opacity:0; transition:opacity .3s var(--ease-out);
+}
+#bgScrim.active{opacity:1;}
+[data-theme="light"] #bgScrim{background:rgba(255,252,244,.62);}
+
+/* ---------- Top bar ---------- */
+.topbar{
+  display:flex; align-items:center; justify-content:space-between;
+  gap:16px;
+  padding:18px clamp(16px,3vw,40px);
+  border-bottom:1px solid var(--line-soft);
+}
+.brand{display:flex;align-items:center;gap:12px;min-width:0;}
+.brand-badge{
+  width:40px;height:40px;border-radius:50%;
+  background:conic-gradient(from 220deg, var(--gold), var(--ember), var(--mint), var(--gold));
+  display:flex;align-items:center;justify-content:center;flex:0 0 auto;
+  box-shadow: var(--shadow-gold);
+}
+.brand-badge img{width:100%;height:100%;border-radius:50%;object-fit:cover;display:block;}
+.brand-badge svg{width:22px;height:22px;}
+.brand-text{min-width:0;}
+.brand-title{
+  font-family:var(--font-display); font-weight:700; font-size:19px; line-height:1.15;
+  white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:46vw;
+  background:linear-gradient(90deg,var(--paper),var(--gold-2));
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+}
+.brand-title[contenteditable="true"]{cursor:text;}
+.brand-title[contenteditable="true"]:hover{outline:1px dashed var(--dim-2); outline-offset:4px; border-radius:4px;}
+.brand-sub{font-size:12px; color:var(--dim); letter-spacing:.02em;}
+
+.topbar-actions{display:flex;align-items:center;gap:8px;flex:0 0 auto;}
+
+.iconbtn{
+  width:40px;height:40px;border-radius:50%;
+  border:1px solid var(--line);
+  background:rgba(246,243,234,.03);
+  color:var(--paper);
+  display:flex;align-items:center;justify-content:center;
+  cursor:pointer; transition:transform .15s var(--ease-out), background .15s, border-color .15s;
+}
+.iconbtn svg{width:18px;height:18px;}
+.iconbtn:hover{background:rgba(246,243,234,.09); border-color:var(--dim-2); transform:translateY(-1px);}
+.iconbtn:active{transform:translateY(0);}
+.iconbtn[aria-pressed="true"]{border-color:var(--gold); color:var(--gold); background:rgba(244,183,64,.10);}
+.iconbtn:disabled{opacity:.32; cursor:not-allowed;}
+.iconbtn:disabled:hover{background:rgba(246,243,234,.03); border-color:var(--line); transform:none;}
+
+.langtoggle{
+  display:flex; align-items:center; background:rgba(246,243,234,.04);
+  border:1px solid var(--line); border-radius:999px; padding:3px; gap:2px;
+}
+.langtoggle button{
+  border:none; background:transparent; color:var(--dim); font-weight:700; font-size:12px;
+  padding:7px 12px; border-radius:999px; cursor:pointer; letter-spacing:.04em;
+  transition:background .18s var(--ease-out), color .18s;
+}
+.langtoggle button.active{background:var(--gold); color:var(--on-accent);}
+.langtoggle button:not(.active):hover{color:var(--paper);}
+
+/* ============================================================
+   STAGE
+   ============================================================ */
+.stage-wrap{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  padding:clamp(14px,2.6vw,34px) clamp(16px,4vw,56px) 28px;
+  gap:clamp(14px,2vw,22px);
+  width:100%;
+  max-width:1320px;
+  margin:0 auto;
+}
+
+/* ---------- Round / stepper tally ---------- */
+.controls-row{
+  display:flex; flex-wrap:wrap; align-items:stretch; justify-content:center;
+  gap:12px; width:100%;
+}
+.prize-pill{
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:8px 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 20px 40px -20px rgba(0,0,0,.6);
+  flex:1 1 260px; max-width:420px; min-width:220px;
+}
+.prize-input{
+  flex:1; min-width:0; background:transparent; border:none; outline:none;
+  font-family:var(--font-display); font-weight:700; font-size:17px;
+  color:var(--gold-2); text-shadow:0 0 16px rgba(244,183,64,.25);
+  padding:4px 0;
+}
+.prize-input::placeholder{
+  color:var(--dim-2); font-weight:600; text-shadow:none;
+  font-family:var(--font-body); font-size:13.5px;
+}
+.tally{
+  display:flex; align-items:center; gap:14px;
+  background:linear-gradient(180deg, var(--ink-3), var(--ink-2));
+  border:1px solid var(--line);
+  border-radius:999px;
+  padding:8px 10px 8px 20px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.04), 0 20px 40px -20px rgba(0,0,0,.6);
+  flex:0 0 auto;
+}
+.tally-label{
+  font-size:11px; letter-spacing:.10em; text-transform:uppercase; color:var(--dim);
+  display:flex; flex-direction:column; gap:2px; line-height:1.3;
+}
+.tally-label b{color:var(--paper); font-size:12px; font-weight:600; text-transform:none; letter-spacing:0;}
+.tally-count{
+  font-family:var(--font-mono); font-weight:600; font-size:30px; width:2.1ch; text-align:center;
+  color:var(--gold-2);
+  text-shadow:0 0 24px rgba(244,183,64,.5);
+  background:transparent; border:none; outline:none; padding:0;
+  border-radius:8px; cursor:text;
+  transition:background .15s;
+}
+.tally-count:hover{background:rgba(244,183,64,.08);}
+.tally-count:focus{background:rgba(244,183,64,.12); box-shadow:0 0 0 2px var(--gold-dim);}
+.tally-btn{
+  width:34px;height:34px;border-radius:50%;
+  border:1px solid var(--line); background:rgba(246,243,234,.04); color:var(--paper);
+  cursor:pointer; display:flex;align-items:center;justify-content:center;
+  transition:background .15s, transform .1s;
+}
+.tally-btn:hover{background:rgba(244,183,64,.14); border-color:var(--gold-dim);}
+.tally-btn:active{transform:scale(.92);}
+.tally-btn:disabled{opacity:.35; cursor:not-allowed;}
+.tally-btn svg{width:14px;height:14px;}
+
+/* ---------- Ticket board ---------- */
+.ticket-board{
+  position:relative;
+  width:100%;
+  background:linear-gradient(180deg, var(--ink-3), var(--ink-2) 55%, var(--ink-3));
+  border:1px solid var(--line);
+  border-radius:var(--radius-xl);
+  box-shadow: 0 30px 80px -30px rgba(0,0,0,.7), inset 0 1px 0 rgba(255,255,255,.04);
+  display:flex;
+  min-height:420px;
+  overflow:hidden;
+}
+.ticket-col{
+  flex:1 1 0; min-width:0;
+  padding:22px 22px 22px;
+  display:flex; flex-direction:column;
+}
+.ticket-seam{
+  flex:0 0 30px; position:relative;
+  background-image: radial-gradient(circle at center, var(--ink) 6px, rgba(246,243,234,.16) 6.5px 7px, transparent 7.5px);
+  background-size: 30px 24px;
+  background-repeat: repeat-y;
+  background-position: center top;
+}
+.ticket-seam::after{
+  content:"";
+  position:absolute; left:50%; top:0; bottom:0; width:0;
+  border-left:2px dashed rgba(246,243,234,.22);
+  transform:translateX(-50%);
+}
+.roster-row{
+  display:flex; align-items:baseline; gap:10px;
+  padding:6px 10px; border-radius:8px;
+  font-size:14px; line-height:1.5;
+  color:var(--dim);
+  white-space:nowrap; overflow:hidden;
+}
+.roster-row .rid{
+  font-family:var(--font-mono); font-size:11px; color:var(--dim-2); flex:0 0 auto;
+}
+.roster-row .rname{color:var(--paper); font-weight:500; overflow:hidden; text-overflow:ellipsis;}
+.roster-row .rcat{margin-left:auto; flex:0 0 auto; font-size:11px; color:var(--dim-2); font-style:italic;}
+.roster-row.spin{color:var(--gold-2);}
+.roster-row.spin .rname{color:var(--gold-2); text-shadow:0 0 12px rgba(244,183,64,.45);}
+.roster-row.placeholder{opacity:.28;}
+.roster-row.placeholder .rname{color:var(--dim-2);}
+
+.ticket-board-header{
+  display:flex; align-items:center; justify-content:space-between;
+  padding-bottom:10px; margin-bottom:8px; border-bottom:1px solid var(--line-soft);
+}
+.ticket-board-header .ttl{
+  font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--dim);
+  display:flex; align-items:center; gap:8px;
+}
+.ticket-board-header .dot{width:6px;height:6px;border-radius:50%;background:var(--mint); box-shadow:0 0 10px var(--mint);}
+.ticket-board-header .dot.live{background:var(--ember); box-shadow:0 0 10px var(--ember); animation:pulse-dot 1s infinite;}
+@keyframes pulse-dot{0%,100%{opacity:1;}50%{opacity:.35;}}
+.ticket-board-header .page-count{font-family:var(--font-mono); font-size:11px; color:var(--dim-2);}
+
+.roster-list{display:flex; flex-direction:column; gap:2px; flex:1;}
+
+/* empty state inside board */
+.board-empty{
+  margin:auto; text-align:center; max-width:360px; padding:40px 20px; color:var(--dim);
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+}
+.board-empty svg{width:46px;height:46px; color:var(--gold-dim); margin-bottom:14px; flex:0 0 auto;}
+.board-empty h3{font-size:18px; margin:0 0 8px; color:var(--paper); font-weight:600; width:100%;}
+.board-empty p{margin:0 0 18px; font-size:13.5px; line-height:1.6; width:100%;}
+
+.btn{
+  border:none; cursor:pointer; font-weight:700; letter-spacing:.02em;
+  border-radius:999px; padding:11px 20px; font-size:13.5px;
+  transition:transform .12s var(--ease-out), box-shadow .18s, filter .15s;
+  display:inline-flex; align-items:center; gap:8px; justify-content:center;
+}
+.btn:active{transform:scale(.97);}
+.btn-gold{background:linear-gradient(180deg,var(--gold-2),var(--gold)); color:#221302; box-shadow:var(--shadow-gold);}
+.btn-gold:hover{filter:brightness(1.06); transform:translateY(-1px);}
+.btn-ghost{background:rgba(246,243,234,.05); color:var(--paper); border:1px solid var(--line);}
+.btn-ghost:hover{background:rgba(246,243,234,.1);}
+.btn-sm{padding:8px 14px; font-size:12.5px;}
+.btn svg{width:15px;height:15px;}
+.btn:disabled{opacity:.4; cursor:not-allowed; transform:none!important;}
+
+/* ---------- Transport bar ---------- */
+.transport{
+  display:flex; align-items:center; justify-content:center; gap:14px;
+  width:100%;
+}
+.transport-side{display:flex; gap:8px;}
+.draw-btn{
+  position:relative;
+  font-family:var(--font-display); font-weight:700; font-size:20px; letter-spacing:.06em;
+  padding:16px 46px; border-radius:999px; border:none; cursor:pointer;
+  background:linear-gradient(180deg,var(--gold-2),var(--gold));
+  color:#221302;
+  box-shadow: 0 0 0 0 rgba(244,183,64,.5), 0 20px 40px -14px rgba(244,183,64,.5);
+  transition:transform .15s var(--ease-out), box-shadow .3s, background .3s;
+}
+.draw-btn:hover{transform:translateY(-2px);}
+.draw-btn:active{transform:translateY(0) scale(.98);}
+.draw-btn.stopping{
+  background:linear-gradient(180deg,var(--ember-2),var(--ember));
+  color:#2b0d04;
+  animation:pulse-ring 1.1s infinite;
+}
+.draw-btn:disabled{opacity:.4; cursor:not-allowed; transform:none;}
+@keyframes pulse-ring{
+  0%{box-shadow:0 0 0 0 rgba(255,107,74,.55), 0 20px 40px -14px rgba(255,107,74,.55);}
+  70%{box-shadow:0 0 0 18px rgba(255,107,74,0), 0 20px 40px -14px rgba(255,107,74,.55);}
+  100%{box-shadow:0 0 0 0 rgba(255,107,74,0), 0 20px 40px -14px rgba(255,107,74,.55);}
+}
+
+.footer-hint{font-size:11.5px; color:var(--dim-2); text-align:center; letter-spacing:.02em;}
+.footer-hint kbd{
+  font-family:var(--font-mono); background:rgba(246,243,234,.08); border:1px solid var(--line);
+  border-radius:5px; padding:1px 6px; font-size:10.5px;
+}
+
+/* ---------- Stat pills ---------- */
+.stats-row{display:flex; gap:10px; flex-wrap:wrap; justify-content:center;}
+.stat-pill{
+  display:flex; align-items:center; gap:8px;
+  background:rgba(246,243,234,.03); border:1px solid var(--line-soft);
+  border-radius:999px; padding:7px 14px 7px 10px;
+  font-size:12px; color:var(--dim);
+}
+.stat-pill b{font-family:var(--font-mono); color:var(--paper); font-size:13px;}
+.stat-pill .swatch{width:8px;height:8px;border-radius:50%;}
+
+/* ============================================================
+   DRAWER (settings)
+   ============================================================ */
+.scrim{
+  position:fixed; inset:0; background:rgba(5,7,16,.55); backdrop-filter:blur(2px);
+  opacity:0; pointer-events:none; transition:opacity .25s var(--ease-out); z-index:40;
+}
+.scrim.open{opacity:1; pointer-events:auto;}
+
+.drawer{
+  position:fixed; top:0; right:0; height:100%; width:min(420px, 92vw);
+  background:linear-gradient(180deg,var(--ink-2),var(--ink));
+  border-left:1px solid var(--line);
+  transform:translateX(100%);
+  transition:transform .32s var(--ease-out);
+  z-index:50;
+  display:flex; flex-direction:column;
+  box-shadow:-40px 0 80px rgba(0,0,0,.5);
+}
+.drawer.open{transform:translateX(0);}
+.drawer-head{
+  display:flex; align-items:center; justify-content:space-between;
+  padding:20px 22px; border-bottom:1px solid var(--line-soft); flex:0 0 auto;
+}
+.drawer-head h2{margin:0; font-size:18px; font-weight:700;}
+.drawer-tabs{display:flex; flex-wrap:wrap; gap:4px 6px; padding:14px 22px 0; flex:0 0 auto;}
+.drawer-tab{
+  border:none; background:transparent; color:var(--dim); font-size:11.5px; font-weight:600;
+  padding:8px 3px; cursor:pointer; border-bottom:2px solid transparent; flex:1 1 auto; min-width:64px;
+}
+.drawer-tab.active{color:var(--gold-2); border-color:var(--gold);}
+.drawer-body{padding:18px 22px 30px; overflow-y:auto; flex:1;}
+.drawer-panel{display:none; flex-direction:column; gap:18px;}
+.drawer-panel.active{display:flex;}
+
+.field{display:flex; flex-direction:column; gap:7px;}
+.field label{font-size:12px; font-weight:600; color:var(--dim); letter-spacing:.02em;}
+.field .help{font-size:11.5px; color:var(--dim-2); line-height:1.5;}
+.field input[type="text"], .field textarea{
+  background:rgba(246,243,234,.04); border:1px solid var(--line); color:var(--paper);
+  border-radius:10px; padding:10px 12px; font-family:var(--font-body); font-size:13.5px;
+  resize:vertical;
+}
+.field textarea{min-height:140px; font-family:var(--font-mono); font-size:12.5px; line-height:1.6;}
+.field input[type="text"]:focus, .field textarea:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:transparent;}
+
+.row-between{display:flex; align-items:center; justify-content:space-between; gap:12px;}
+.switch{position:relative; display:inline-flex; width:42px; height:24px; flex:0 0 auto;}
+.switch input{opacity:0; width:0; height:0;}
+.switch .track{position:absolute; inset:0; background:var(--ink-4); border-radius:999px; transition:background .2s; cursor:pointer;}
+.switch .track::before{content:""; position:absolute; width:18px; height:18px; left:3px; top:3px; background:var(--paper); border-radius:50%; transition:transform .2s var(--ease-spring);}
+.switch input:checked + .track{background:var(--gold-dim);}
+.switch input:checked + .track::before{transform:translateX(18px); background:var(--on-accent);}
+
+.segmented{
+  display:flex; background:rgba(246,243,234,.04); border:1px solid var(--line);
+  border-radius:12px; padding:3px; gap:3px; margin-top:8px;
+}
+.segmented-btn{
+  flex:1; border:none; background:transparent; color:var(--dim);
+  font-size:12.5px; font-weight:700; padding:9px 10px; border-radius:9px;
+  cursor:pointer; transition:background .18s var(--ease-out), color .18s;
+}
+.segmented-btn.active{background:var(--gold); color:var(--on-accent);}
+.segmented-btn:not(.active):hover{color:var(--paper); background:rgba(246,243,234,.06);}
+
+.upload-zone{
+  border:1.5px dashed var(--line); border-radius:14px; padding:18px; text-align:center;
+  cursor:pointer; transition:border-color .15s, background .15s;
+  font-size:12.5px; color:var(--dim);
+}
+.upload-zone:hover{border-color:var(--gold-dim); background:rgba(244,183,64,.04);}
+.upload-zone svg{width:22px;height:22px; color:var(--gold-dim); margin-bottom:8px;}
+
+.logo-preview{
+  width:56px;height:56px;border-radius:50%; object-fit:cover; border:1px solid var(--line);
+  background:var(--ink-3);
+}
+.bg-preview{
+  width:100%; height:110px; border-radius:14px; overflow:hidden;
+  border:1px solid var(--line); background:var(--ink-3);
+}
+.bg-preview img{width:100%;height:100%;object-fit:cover;display:block;}
+.divider{height:1px; background:var(--line-soft); border:none; margin:2px 0;}
+
+.history-list{display:flex; flex-direction:column; gap:8px;}
+.history-round{
+  font-size:11px; color:var(--dim-2); text-transform:uppercase; letter-spacing:.08em; margin-top:6px;
+  cursor:text; border-radius:4px; padding:2px 4px; margin-left:-4px;
+  transition:background .15s, outline-color .15s;
+}
+.history-round:hover, .history-round:focus{
+  outline:1px dashed var(--dim-2); outline-offset:2px; background:rgba(244,183,64,.06);
+}
+.history-round:focus{ color:var(--gold-2); outline-color:var(--gold-dim); }
+.history-item{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(246,243,234,.03); border:1px solid var(--line-soft);
+  border-radius:10px; padding:9px 12px;
+}
+.history-item .num{
+  width:22px;height:22px;border-radius:50%; background:var(--ink-4); color:var(--gold-2);
+  font-family:var(--font-mono); font-size:11px; display:flex; align-items:center; justify-content:center; flex:0 0 auto;
+}
+.history-item .info{min-width:0; flex:1;}
+.history-item .name{font-size:13px; color:var(--paper); font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.history-item .meta{font-size:11px; color:var(--dim-2); font-family:var(--font-mono);}
+.history-empty{font-size:12.5px; color:var(--dim-2); text-align:center; padding:26px 10px;}
+
+.participant-list-view{
+  max-height:280px; overflow-y:auto;
+  display:flex; flex-direction:column; gap:6px;
+  border:1px solid var(--line-soft); border-radius:12px; padding:8px;
+  background:rgba(246,243,234,.02);
+}
+.plv-empty{text-align:center; padding:22px 10px; font-size:12.5px; color:var(--dim-2);}
+.plv-item{
+  display:flex; align-items:center; gap:10px;
+  background:rgba(246,243,234,.03); border:1px solid var(--line-soft);
+  border-radius:10px; padding:8px 12px; transition:opacity .15s;
+}
+.plv-item{flex-wrap:wrap;}
+.plv-item .plv-extra{flex:0 0 100%; font-size:10.5px; color:var(--dim-2); padding-left:0; line-height:1.4;}
+.plv-item.won{opacity:.5;}
+.plv-item .plv-id{font-family:var(--font-mono); font-size:10.5px; color:var(--dim-2); flex:0 0 auto; min-width:40px;}
+.plv-item .plv-name{font-size:13px; color:var(--paper); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.plv-item .plv-email{font-family:var(--font-mono); font-size:10.5px; color:var(--dim); flex:0 1 auto; max-width:140px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.plv-item .plv-cat{font-size:11px; color:var(--dim-2); font-style:italic; flex:0 0 auto; max-width:90px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.plv-item .plv-won-badge{
+  font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--mint);
+  flex:0 0 auto; border:1px solid var(--mint); border-radius:5px; padding:2px 5px;
+}
+
+.checkin-qr-wrap{
+  display:flex; flex-direction:column; align-items:center; gap:10px;
+  background:rgba(246,243,234,.03); border:1px solid var(--line-soft);
+  border-radius:16px; padding:18px;
+}
+.checkin-qr-wrap img{
+  width:180px; height:180px; border-radius:12px; background:#fff; padding:10px;
+  display:block;
+}
+.checkin-url-row{
+  display:flex; align-items:center; gap:8px; width:100%;
+  background:rgba(246,243,234,.04); border:1px solid var(--line-soft);
+  border-radius:10px; padding:8px 10px;
+}
+.checkin-url-row code{
+  flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  font-family:var(--font-mono); font-size:11.5px; color:var(--gold-2);
+}
+.checkin-fields-list{display:flex; flex-direction:column; gap:6px;}
+.checkin-field-item{
+  display:flex; align-items:center; gap:8px;
+  background:rgba(246,243,234,.03); border:1px solid var(--line-soft);
+  border-radius:10px; padding:8px 12px;
+}
+.checkin-field-item .cfi-label{font-size:13px; color:var(--paper); font-weight:600; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
+.checkin-field-item .cfi-required{
+  font-size:9px; font-weight:700; letter-spacing:.05em; text-transform:uppercase; color:var(--gold-2);
+  border:1px solid var(--gold-dim); border-radius:5px; padding:2px 5px; flex:0 0 auto;
+}
+.checkin-field-item .cfi-remove{
+  flex:0 0 auto; width:24px; height:24px; border-radius:50%; border:1px solid var(--line);
+  background:transparent; color:var(--dim); cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+.checkin-field-item .cfi-remove:hover{color:var(--ember); border-color:var(--ember);}
+.checkin-add-field{display:flex; gap:8px; align-items:center; flex-wrap:wrap;}
+.checkin-add-field input[type="text"]{
+  flex:1; min-width:120px; background:rgba(246,243,234,.04); border:1px solid var(--line); color:var(--paper);
+  border-radius:10px; padding:9px 12px; font-size:13px;
+}
+.checkin-required-check{display:flex; align-items:center; gap:6px; font-size:12px; color:var(--dim); flex:0 0 auto; white-space:nowrap;}
+.checkin-required-check input{accent-color:var(--gold);}
+
+.btn-block{width:100%;}
+.danger-zone{border:1px solid rgba(255,107,74,.3); background:rgba(255,107,74,.06); border-radius:14px; padding:14px;}
+.danger-zone p{font-size:12px; color:var(--dim); margin:0 0 10px; line-height:1.55;}
+
+/* ============================================================
+   WINNER OVERLAY
+   ============================================================ */
+.overlay{
+  position:fixed; inset:0; z-index:60;
+  display:flex; align-items:center; justify-content:center;
+  padding:16px;
+  opacity:0; pointer-events:none;
+  transition:opacity .35s var(--ease-out);
+}
+.overlay.open{opacity:1; pointer-events:auto;}
+.overlay-bg{
+  position:absolute; inset:0;
+  background:radial-gradient(900px 600px at 50% 40%, rgba(44,20,88,.9), rgba(5,7,16,.92));
+}
+.reveal-card{
+  position:relative; z-index:2;
+  width:min(640px, 100%);
+  background:linear-gradient(180deg,var(--ink-3),var(--ink-2));
+  border:1px solid rgba(244,183,64,.35);
+  border-radius:var(--radius-xl);
+  padding:clamp(22px,3.4vw,40px);
+  text-align:center;
+  box-shadow:0 40px 120px -20px rgba(0,0,0,.7), 0 0 0 1px rgba(244,183,64,.08), 0 0 90px rgba(244,183,64,.18);
+  transform:scale(.85) translateY(20px);
+  opacity:0;
+  transition:transform .5s var(--ease-spring), opacity .4s var(--ease-out), width .25s var(--ease-out);
+  max-height:95vh; overflow-y:auto;
+}
+.reveal-card.wide{width:min(940px, 96vw);}
+.reveal-card.xwide{width:min(1440px, 98vw);}
+.overlay.open .reveal-card{transform:scale(1) translateY(0); opacity:1;}
+
+.rosette{
+  width:64px;height:64px; margin:0 auto 18px; border-radius:50%;
+  background:conic-gradient(from 220deg,var(--gold),var(--ember),var(--mint),var(--gold));
+  display:flex; align-items:center; justify-content:center;
+  box-shadow:var(--shadow-gold);
+  flex:0 0 auto;
+}
+.rosette svg{width:30px;height:30px; color:var(--on-accent);}
+
+.reveal-eyebrow{
+  font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--gold-2);
+  margin-bottom:10px; font-weight:700;
+}
+.reveal-subheading{
+  font-size:13.5px; color:var(--dim); margin-top:4px; font-weight:600;
+  text-transform:uppercase; letter-spacing:.06em;
+}
+/* Default (1 winner): hero stacked layout */
+.reveal-names{display:flex; flex-direction:column; gap:14px; margin:18px 0 8px;}
+.reveal-name-card{
+  background:rgba(246,243,234,.04); border:1px solid var(--line); border-radius:16px;
+  padding:16px 20px;
+  min-width:0;
+}
+.reveal-name{
+  font-family:var(--font-display); font-weight:700; font-size:clamp(22px,4vw,32px);
+  color:var(--paper); line-height:1.2;
+  overflow-wrap:break-word;
+}
+.reveal-id{font-family:var(--font-mono); font-size:12.5px; color:var(--gold-2); margin-bottom:4px;}
+.reveal-cat{font-size:12px; color:var(--dim); font-style:italic; margin-top:4px;}
+
+/* Multi-winner grid tiers: many winners shown at once, no scrolling required */
+.reveal-names.tier-sm{display:grid; grid-template-columns:repeat(auto-fit,minmax(230px,1fr)); gap:14px; margin:18px 0 6px; text-align:left;}
+.reveal-names.tier-sm .reveal-name{font-size:21px;}
+.reveal-names.tier-sm .reveal-name-card{padding:15px 18px;}
+
+.reveal-names.tier-md{display:grid; grid-template-columns:repeat(auto-fit,minmax(190px,1fr)); gap:12px; margin:16px 0 4px; text-align:left;}
+.reveal-names.tier-md .reveal-name{font-size:18px;}
+.reveal-names.tier-md .reveal-name-card{padding:12px 15px;}
+.reveal-names.tier-md .reveal-id{font-size:11.5px;}
+.reveal-names.tier-md .reveal-cat{font-size:11.5px;}
+
+.reveal-names.tier-lg{display:grid; grid-template-columns:repeat(auto-fit,minmax(165px,1fr)); gap:11px; margin:14px 0 4px; text-align:left;}
+.reveal-names.tier-lg .reveal-name{font-size:15.5px; line-height:1.28;}
+.reveal-names.tier-lg .reveal-name-card{padding:11px 14px; border-radius:12px;}
+.reveal-names.tier-lg .reveal-id{font-size:10.5px; margin-bottom:2px;}
+.reveal-names.tier-lg .reveal-cat{font-size:10.5px; margin-top:2px;}
+
+.reveal-actions{display:flex; gap:10px; justify-content:center; margin-top:24px; flex-wrap:wrap;}
+
+/* ============================================================
+   TOASTS
+   ============================================================ */
+.toast-container{
+  position:fixed; bottom:22px; left:50%; transform:translateX(-50%);
+  display:flex; flex-direction:column; gap:8px; z-index:80; align-items:center;
+  pointer-events:none;
+}
+.toast{
+  background:var(--ink-3); border:1px solid var(--line); color:var(--paper);
+  padding:11px 18px; border-radius:999px; font-size:13px;
+  box-shadow:0 20px 40px -14px rgba(0,0,0,.6);
+  opacity:0; transform:translateY(10px); transition:opacity .25s, transform .25s;
+  display:flex; align-items:center; gap:8px;
+}
+.toast.show{opacity:1; transform:translateY(0);}
+.toast .dot{width:7px;height:7px;border-radius:50%; background:var(--mint);}
+.toast.warn .dot{background:var(--ember);}
+
+#confettiCanvas{position:fixed; inset:0; z-index:65; pointer-events:none;}
+
+/* ============================================================
+   RESPONSIVE
+   ============================================================ */
+@media (max-width:760px){
+  .ticket-board{flex-direction:column; min-height:0;}
+  .ticket-seam{flex:0 0 20px; background-image:radial-gradient(circle at center, var(--ink) 5px, rgba(246,243,234,.16) 5.5px 6px, transparent 6.5px); background-size:24px 20px; background-repeat:repeat-x;}
+  .ticket-seam::after{left:0; right:0; top:50%; bottom:auto; height:0; width:auto; border-left:none; border-top:2px dashed rgba(246,243,234,.22); transform:translateY(-50%);}
+  .brand-title{max-width:38vw;}
+  .draw-btn{padding:14px 32px; font-size:17px;}
+  .reveal-names{max-height:50vh; overflow-y:auto;}
+}
+@media (max-width:520px){
+  .topbar{padding:14px 14px;}
+  .brand-title{font-size:15px; max-width:32vw;}
+  .stats-row{display:none;}
+}
+
+/* ============================================================
+   MOTION PREFERENCES
+   ============================================================ */
+@media (prefers-reduced-motion: reduce){
+  *{animation-duration:.001ms!important; animation-iteration-count:1!important; transition-duration:.001ms!important;}
+}
+
+/* focus visibility */
+a:focus-visible, button:focus-visible, [tabindex]:focus-visible, input:focus-visible, textarea:focus-visible{
+  outline:2px solid var(--gold); outline-offset:2px;
+}
+
+/* ============================================================
+   QR CHECK-IN (standalone page): status line + public link
+   ============================================================ */
+.checkin-qr-placeholder{
+  width:180px; min-height:180px; padding:16px; border-radius:12px;
+  border:1px dashed var(--line); background:rgba(246,243,234,.04);
+  display:flex; align-items:center; justify-content:center; text-align:center;
+  font-size:12.5px; line-height:1.5; color:var(--dim);
+}
+.checkin-qr-wrap > .help{font-size:11.5px; color:var(--dim-2); line-height:1.5; text-align:center;}
+.checkin-status{
+  display:flex; align-items:center; gap:8px; width:100%;
+  font-size:12px; line-height:1.45; color:var(--dim);
+}
+.checkin-status .ck-dot{flex:0 0 auto; width:8px; height:8px; border-radius:50%; background:var(--dim-2);}
+.checkin-status .ck-text{flex:1; min-width:0;}
+.checkin-status.ready .ck-dot{background:var(--mint);}
+.checkin-status.busy .ck-dot{background:var(--gold); animation:ckPulse 1.2s ease-in-out infinite;}
+.checkin-status.error{color:var(--ember-2);}
+.checkin-status.error .ck-dot{background:var(--ember);}
+@keyframes ckPulse{50%{opacity:.3;}}
+@media (prefers-reduced-motion: reduce){ .checkin-status.busy .ck-dot{animation:none;} }
+#checkinStatusBig:empty{display:none;}
+
+/* ============================================================
+   ATTENDEE MODE: the form a phone shows after scanning the QR
+   ============================================================ */
+#attendeeRoot{
+  display:none; position:relative; z-index:1;
+  min-height:100vh; min-height:100dvh;
+  align-items:center; justify-content:center; padding:24px 16px;
+}
+html[data-mode="attendee"] #app-root,
+html[data-mode="attendee"] #bgImageLayer,
+html[data-mode="attendee"] #bgScrim{display:none !important;}
+html[data-mode="attendee"] #attendeeRoot{display:flex;}
+
+.att-card{
+  width:100%; max-width:440px;
+  background:var(--ink-2); border:1px solid var(--line); border-radius:var(--radius-lg);
+  padding:28px 24px 26px;
+  box-shadow:0 24px 60px -28px rgba(10,14,31,.45);
+}
+.att-logo{display:block; max-height:56px; max-width:60%; margin:0 0 14px; object-fit:contain;}
+.att-title{
+  font-family:var(--font-display); font-size:clamp(24px,7vw,30px); line-height:1.15;
+  font-weight:700; letter-spacing:-.01em; margin:0 0 8px; color:var(--paper); overflow-wrap:anywhere;
+}
+.att-lead, .att-body{font-size:14.5px; line-height:1.55; color:var(--dim); margin:0;}
+.att-field{display:flex; flex-direction:column; gap:6px; margin-top:16px;}
+.att-field label{font-size:13px; font-weight:600; color:var(--paper);}
+.att-field label .opt{font-weight:500; color:var(--dim); margin-left:6px;}
+.att-field input{
+  width:100%; min-height:48px; padding:12px 14px;
+  font:inherit; font-size:16px; color:var(--paper);
+  background:var(--ink); border:1px solid var(--line); border-radius:var(--radius-sm);
+}
+.att-field input:focus{outline:2px solid var(--gold); outline-offset:1px; border-color:transparent;}
+.att-field.invalid input{border-color:var(--ember);}
+.att-hint{font-size:12.5px; line-height:1.45; color:var(--dim);}
+.att-error{font-size:12.5px; line-height:1.45; color:var(--ember-2);}
+.att-alert{
+  margin-top:16px; padding:10px 12px; border-radius:var(--radius-sm);
+  border:1px solid var(--ember); background:rgba(225,85,47,.08);
+  color:var(--ember-2); font-size:13px; line-height:1.45;
+}
+.att-btn{
+  width:100%; margin-top:22px; min-height:50px; padding:13px 20px;
+  border:none; border-radius:999px; cursor:pointer;
+  font:inherit; font-size:15px; font-weight:700; letter-spacing:.02em;
+  background:linear-gradient(180deg,var(--gold-2),var(--gold)); color:#221302; box-shadow:var(--shadow-gold);
+}
+.att-btn:focus-visible{outline:2px solid var(--paper); outline-offset:3px;}
+.att-state{text-align:center; padding:6px 0 2px;}
+.att-state .att-title{margin-bottom:10px;}
+.att-icon{
+  width:56px; height:56px; margin:0 auto 16px; border-radius:50%;
+  display:flex; align-items:center; justify-content:center; border:1.5px solid currentColor;
+}
+.att-icon svg{width:26px; height:26px;}
+.att-state.ok .att-icon{color:var(--mint);}
+.att-state.warn .att-icon{color:var(--gold-dim);}
+.att-state.bad .att-icon{color:var(--ember);}
+.att-spin{
+  width:30px; height:30px; margin:4px auto 16px; border-radius:50%;
+  border:3px solid var(--line); border-top-color:var(--gold);
+  animation:attSpin .8s linear infinite;
+}
+@keyframes attSpin{to{transform:rotate(360deg);}}
+@media (prefers-reduced-motion: reduce){ .att-spin{animation-duration:2.4s;} }
+
+/* ============================================================
+   FULLSCREEN: hide the top-right menus so only the stage shows
+   (space is kept, so nothing on the stage shifts)
+   ============================================================ */
+.topbar-actions{transition:opacity .25s ease;}
+html.is-fullscreen .topbar-actions{
+  opacity:0; visibility:hidden; pointer-events:none;
+  transition:opacity .25s ease, visibility 0s linear .25s;
+}
+@media (prefers-reduced-motion: reduce){
+  .topbar-actions, html.is-fullscreen .topbar-actions{transition:none;}
+}
+</style>
+</head>
+<body>
+<div id="bgImageLayer"></div>
+<div id="bgScrim"></div>
+<div id="app-root">
+
+  <!-- ===================== TOP BAR ===================== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-badge" id="brandBadge">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#0A0E1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2V7z"/><path d="M12 22V7M12 7c-1.5-3-5-4-5-1.5S9 7 12 7zm0 0c1.5-3 5-4 5-1.5S15 7 12 7z"/></svg>
+      </div>
+      <div class="brand-text">
+        <h1 class="brand-title" id="eventTitle" contenteditable="true" spellcheck="false">Lucky Draw</h1>
+        <div class="brand-sub" id="eventOrg" contenteditable="true" spellcheck="false" data-i18n-ph="orgPlaceholder">&nbsp;</div>
+      </div>
+    </div>
+    <div class="topbar-actions">
+      <div class="stats-row" id="statsRow" style="margin-right:6px;"></div>
+      <div class="langtoggle" role="group" aria-label="Language">
+        <button type="button" data-lang-btn="en" class="active">EN</button>
+        <button type="button" data-lang-btn="id">ID</button>
+      </div>
+      <button type="button" class="iconbtn" id="themeBtn" aria-pressed="false" title="Theme">
+        <svg id="themeIconDark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        <svg id="themeIconLight" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+      </button>
+      <button type="button" class="iconbtn" id="soundBtn" aria-pressed="true" title="Sound">
+        <svg id="soundIconOn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg>
+        <svg id="soundIconOff" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:none"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><line x1="23" y1="9" x2="17" y2="15"/><line x1="17" y1="9" x2="23" y2="15"/></svg>
+      </button>
+      <button type="button" class="iconbtn" id="fullscreenBtn" title="Fullscreen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+      </button>
+      <button type="button" class="iconbtn" id="settingsBtn" title="Settings">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- ===================== STAGE ===================== -->
+  <main class="stage-wrap">
+
+    <div class="controls-row" id="controlsRow">
+      <div class="prize-pill" id="prizePill">
+        <div class="tally-label"><span data-i18n="prizeLabel">Prize</span><b data-i18n="prizeSub">this round</b></div>
+        <input type="text" id="prizeNameInput" class="prize-input" maxlength="40" placeholder="e.g. iPhone 15 Pro">
+      </div>
+      <div class="tally" id="tallyWrap">
+        <div class="tally-label"><span data-i18n="tallyLabel">Winners per round</span><b id="tallySub" data-i18n="tallySub">This round</b></div>
+        <button type="button" class="tally-btn" id="tallyMinus" aria-label="Decrease">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <input type="text" inputmode="numeric" class="tally-count" id="tallyCount" value="1" maxlength="2" aria-label="Winners this round">
+        <button type="button" class="tally-btn" id="tallyPlus" aria-label="Increase">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+      </div>
+    </div>
+
+    <!-- shown only when there are no participants loaded yet -->
+    <div class="board-empty" id="noParticipantsHint" style="display:none;">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2V7z"/><path d="M12 22V7M12 7c-1.5-3-5-4-5-1.5S9 7 12 7zm0 0c1.5-3 5-4 5-1.5S15 7 12 7z"/></svg>
+      <h3 data-i18n="emptyTitle">No participants yet</h3>
+      <p data-i18n="emptyBody">Import your guest list to start the draw — paste a list, upload a CSV/Excel file, or try it with sample data.</p>
+      <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+        <button type="button" class="btn btn-gold btn-sm" id="emptyImportBtn" data-i18n="btnImport">Import participants</button>
+        <button type="button" class="btn btn-ghost btn-sm" id="emptySampleBtn" data-i18n="btnLoadSample">Load sample data</button>
+      </div>
+    </div>
+
+    <!-- the roster board only appears on stage while a draw is actively shuffling -->
+    <div class="ticket-board" id="ticketBoard" style="--stage-bg:var(--ink); display:none;">
+      <div class="ticket-col" id="colLeft">
+        <div class="ticket-board-header">
+          <span class="ttl"><span class="dot" id="liveDot"></span><span id="boardStatusLabel" data-i18n="boardShuffling">Drawing…</span></span>
+        </div>
+        <div class="roster-list" id="rosterLeft"></div>
+      </div>
+      <div class="ticket-seam"></div>
+      <div class="ticket-col" id="colRight">
+        <div class="ticket-board-header">
+          <span class="ttl font-mono" id="participantCountLabel"></span>
+        </div>
+        <div class="roster-list" id="rosterRight"></div>
+      </div>
+    </div>
+
+    <div class="transport">
+      <button type="button" class="iconbtn" id="undoBtn" title="Undo last draw" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/></svg>
+      </button>
+      <button type="button" class="draw-btn" id="drawBtn" data-i18n="btnDraw">DRAW</button>
+      <button type="button" class="iconbtn" id="historyBtn" title="Winners history">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="m9 16 2 2 4-4"/></svg>
+      </button>
+    </div>
+
+    <div class="footer-hint" id="footerHint" data-i18n="footerHint">Press <kbd>Space</kbd> to draw</div>
+  </main>
+
+  <!-- ===================== SETTINGS DRAWER ===================== -->
+  <div class="scrim" id="scrim"></div>
+  <aside class="drawer" id="drawer" aria-label="Settings">
+    <div class="drawer-head">
+      <h2 data-i18n="settingsTitle">Settings</h2>
+      <button type="button" class="iconbtn" id="drawerCloseBtn" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="drawer-tabs" role="tablist">
+      <button type="button" class="drawer-tab active" data-tab="data" data-i18n="tabData">Participants</button>
+      <button type="button" class="drawer-tab" data-tab="checkin" data-i18n="tabCheckin">Check-in</button>
+      <button type="button" class="drawer-tab" data-tab="brand" data-i18n="tabBrand">Branding</button>
+      <button type="button" class="drawer-tab" data-tab="options" data-i18n="tabOptions">Options</button>
+      <button type="button" class="drawer-tab" data-tab="history" data-i18n="tabHistory">History</button>
+    </div>
+    <div class="drawer-body">
+
+      <!-- DATA TAB -->
+      <div class="drawer-panel active" data-panel="data">
+        <div class="field">
+          <label id="participantCountBig" data-i18n="labelParticipants">Participants</label>
+          <span class="help" id="participantSummary">No participants loaded yet.</span>
+        </div>
+        <button type="button" class="btn btn-ghost btn-sm btn-block" id="downloadTemplateBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          <span data-i18n="btnDownloadTemplate">Download Excel template</span>
+        </button>
+        <div class="upload-zone" id="uploadZone">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+          <div data-i18n="labelUpload">Upload CSV / Excel / TXT</div>
+          <input type="file" id="fileInput" accept=".csv,.txt,.xlsx,.xls" class="visually-hidden">
+        </div>
+        <div class="field">
+          <label data-i18n="labelOrPaste">…or paste one participant per line</label>
+          <textarea id="pasteArea" placeholder="D1392 - I Gusti Agung Anom Yudistira - Society&#10;D2904 - Elice Chandra - Society&#10;Jordan Lee"></textarea>
+          <span class="help" data-i18n="labelParticipantsHelp">Format: ID - Name - Category (ID and category are optional — a plain name per line also works).</span>
+          <button type="button" class="btn btn-gold btn-sm btn-block" id="applyPasteBtn" data-i18n="btnApplyList">Use this list</button>
+        </div>
+        <hr class="divider">
+        <div class="row-between">
+          <button type="button" class="btn btn-ghost btn-sm" id="loadSampleBtn" data-i18n="btnLoadSample">Load sample data</button>
+          <button type="button" class="btn btn-ghost btn-sm" id="clearDataBtn" data-i18n="btnClearData">Clear list</button>
+        </div>
+        <hr class="divider">
+        <div class="field">
+          <div class="row-between">
+            <label data-i18n="labelCurrentList">Current list</label>
+            <span class="help" id="currentListCount"></span>
+          </div>
+          <div class="participant-list-view" id="participantListView"></div>
+          <button type="button" class="btn btn-ghost btn-sm btn-block" id="exportParticipantsBtn" data-i18n="btnExportParticipants">Export participants (CSV)</button>
+        </div>
+      </div>
+
+      <!-- CHECK-IN TAB -->
+      <div class="drawer-panel" data-panel="checkin">
+        <div id="checkinUnavailable" class="field" style="display:none;">
+          <span class="help" data-i18n="checkinUnavailableMsg">QR check-in needs the Lucky Draw desktop app — this standalone HTML page can't run a local server. Everything else here still works the same.</span>
+        </div>
+
+        <div id="checkinAvailable" style="display:none; flex-direction:column; gap:18px;">
+          <div class="field row-between">
+            <div>
+              <label style="margin-bottom:4px;display:block;" data-i18n="labelCheckinOpen">Accepting check-ins</label>
+              <span class="help" data-i18n="labelCheckinOpenHelp">Turn off once registration for this event is done.</span>
+            </div>
+            <label class="switch"><input type="checkbox" id="checkinOpenToggle" checked><span class="track"></span></label>
+          </div>
+
+          <div class="field">
+            <label data-i18n="labelAllowedDomains">Restrict to email domains (optional)</label>
+            <span class="help" data-i18n="labelAllowedDomainsHelp">Only these can check in. Use ".edu" for any .edu address, or a full domain like "gmail.com" or "binus.ac.id". Separate multiple with commas. Leave blank to allow any email.</span>
+            <input type="text" id="checkinAllowedDomainsInput" maxlength="200" placeholder=".edu, gmail.com, binus.ac.id">
+          </div>
+
+          <div class="field" id="checkinWebSetup" style="display:none;">
+            <label for="checkinPublicUrlInput" data-i18n="labelPublicUrl">Public link of this page</label>
+            <span class="help" data-i18n="labelPublicUrlHelp">Phones can't open a file saved on this computer. Upload this HTML file to a free web host, then paste its link here.</span>
+            <input type="text" id="checkinPublicUrlInput" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://jwccampus-eng.github.io/senayancampus/">
+          </div>
+
+          <div class="checkin-qr-wrap">
+            <img id="checkinQrImg" alt="QR code" />
+            <div class="checkin-qr-placeholder" id="checkinQrPlaceholder" style="display:none;"></div>
+            <div class="checkin-url-row">
+              <code id="checkinUrlText"></code>
+              <button type="button" class="btn btn-ghost btn-sm" id="checkinCopyBtn" data-i18n="btnCopyLink">Copy link</button>
+            </div>
+            <div class="checkin-status" id="checkinWebStatus" role="status" style="display:none;">
+              <span class="ck-dot"></span>
+              <span class="ck-text" id="checkinWebStatusText"></span>
+              <button type="button" class="btn btn-ghost btn-sm" id="checkinRetryBtn" style="display:none;" data-i18n="btnRetry">Try again</button>
+            </div>
+            <span class="help" id="checkinNetworkHint"></span>
+            <button type="button" class="btn btn-gold btn-sm btn-block" id="checkinFullscreenBtn" data-i18n="btnShowQrFullscreen">Show QR fullscreen</button>
+          </div>
+
+          <div class="row-between">
+            <span class="help" id="checkinCountLabel"></span>
+          </div>
+
+          <hr class="divider">
+
+          <div class="field">
+            <label data-i18n="labelCheckinFields">Form fields</label>
+            <span class="help" data-i18n="labelCheckinFieldsHelp">Full name and email are always collected. Add more if you need them, e.g. phone number or table.</span>
+            <div class="checkin-fields-list" id="checkinFieldsList"></div>
+            <div class="checkin-add-field">
+              <input type="text" id="checkinNewFieldLabel" maxlength="40">
+              <label class="checkin-required-check"><input type="checkbox" id="checkinNewFieldRequired"><span data-i18n="labelRequired">Required</span></label>
+              <button type="button" class="btn btn-gold btn-sm" id="checkinAddFieldBtn" data-i18n="btnAddField">Add field</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BRANDING TAB -->
+      <div class="drawer-panel" data-panel="brand">
+        <div class="field">
+          <label data-i18n="labelEventTitle">Event title</label>
+          <input type="text" id="titleInput" maxlength="60">
+        </div>
+        <div class="field">
+          <label data-i18n="labelOrgName">Organizer / subtitle</label>
+          <input type="text" id="orgInput" maxlength="60">
+        </div>
+        <div class="field">
+          <label data-i18n="labelLogo">Event logo</label>
+          <div class="row-between">
+            <img class="logo-preview" id="logoPreview" alt="">
+            <div style="display:flex; gap:8px;">
+              <button type="button" class="btn btn-ghost btn-sm" id="logoUploadBtn" data-i18n="btnUploadLogo">Upload</button>
+              <button type="button" class="btn btn-ghost btn-sm" id="logoRemoveBtn" data-i18n="btnRemove">Remove</button>
+            </div>
+            <input type="file" id="logoInput" accept="image/*" class="visually-hidden">
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="field">
+          <label data-i18n="labelBgImage">Background image</label>
+          <span class="help" data-i18n="labelBgImageHelp">Shown behind the whole app. JPG, PNG, or other image types all work.</span>
+          <div class="bg-preview" id="bgPreviewWrap" style="display:none;">
+            <img id="bgPreview" alt="">
+          </div>
+          <div class="row-between" style="margin-top:8px;">
+            <button type="button" class="btn btn-ghost btn-sm" id="bgUploadBtn" data-i18n="btnUploadBg">Upload image</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="bgRemoveBtn" data-i18n="btnRemoveBg">Remove</button>
+          </div>
+          <input type="file" id="bgInput" accept="image/*" class="visually-hidden">
+        </div>
+      </div>
+
+      <!-- OPTIONS TAB -->
+      <div class="drawer-panel" data-panel="options">
+        <div class="field">
+          <label style="margin-bottom:2px;display:block;" data-i18n="labelStopMode">Draw stop mode</label>
+          <span class="help" data-i18n="labelStopModeHelp">Auto-stop reveals the winner for you; manual stop waits for your click every time.</span>
+          <div class="segmented" id="stopModeSegmented" role="group">
+            <button type="button" class="segmented-btn" data-stop-mode="auto" data-i18n="stopModeAuto">Auto stop</button>
+            <button type="button" class="segmented-btn" data-stop-mode="manual" data-i18n="stopModeManual">Manual stop</button>
+          </div>
+          <div class="row-between" id="autoStopSecondsRow" style="margin-top:10px;">
+            <label style="font-size:12.5px;color:var(--dim);font-weight:600;" data-i18n="labelAutoStopSeconds">Stop after (seconds)</label>
+            <input type="number" id="autoStopSeconds" min="3" max="30" step="1" style="width:64px;text-align:center;background:rgba(246,243,234,.04);border:1px solid var(--line);color:var(--paper);border-radius:8px;padding:6px 4px;font-family:var(--font-mono);">
+          </div>
+        </div>
+        <hr class="divider">
+        <div class="field row-between">
+          <div>
+            <label style="margin-bottom:4px;display:block;" data-i18n="labelExcludePrevious">Remove winners from the pool</label>
+            <span class="help" data-i18n="labelExcludePreviousHelp">Off lets the same person be drawn again.</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="excludeToggle" checked><span class="track"></span></label>
+        </div>
+        <div class="field row-between">
+          <div>
+            <label style="margin-bottom:4px;display:block;" data-i18n="labelSound">Sound effects</label>
+            <span class="help" data-i18n="labelSoundHelp">Plays a short chime on reveal.</span>
+          </div>
+          <label class="switch"><input type="checkbox" id="soundToggle" checked><span class="track"></span></label>
+        </div>
+        <hr class="divider">
+        <div class="danger-zone">
+          <p data-i18n="resetWarning">Clears all participants and winner history. This can't be undone.</p>
+          <button type="button" class="btn btn-ghost btn-sm btn-block" id="resetAllBtn" data-i18n="btnReset">Reset everything</button>
+        </div>
+      </div>
+
+      <!-- HISTORY TAB -->
+      <div class="drawer-panel" data-panel="history">
+        <div class="row-between">
+          <span class="help" id="historyCountLabel" data-i18n="historyEmpty">No winners yet</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="exportCsvBtn" data-i18n="btnExport">Export CSV</button>
+        </div>
+        <div class="history-list" id="historyList"></div>
+      </div>
+
+    </div>
+  </aside>
+
+  <!-- ===================== WINNER OVERLAY ===================== -->
+  <div class="overlay" id="winnerOverlay" role="dialog" aria-modal="true">
+    <div class="overlay-bg"></div>
+    <div class="reveal-card">
+      <div class="rosette">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="6"/><path d="M15.5 13.5 17 22l-5-3-5 3 1.5-8.5"/></svg>
+      </div>
+      <div class="reveal-eyebrow" id="revealEyebrow" data-i18n="reveal-eyebrow">Congratulations</div>
+      <h2 class="font-display" id="revealHeading" style="margin:0; font-size:clamp(20px,3vw,26px);" data-i18n="winnerSingular">Winner</h2>
+      <div class="reveal-subheading" id="revealSubheading" style="display:none;"></div>
+      <div class="reveal-names" id="revealNames"></div>
+      <div class="reveal-actions">
+        <button type="button" class="btn btn-gold" id="continueBtn" data-i18n="btnContinue">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="checkinQrOverlay" role="dialog" aria-modal="true">
+    <div class="overlay-bg"></div>
+    <div class="reveal-card" style="text-align:center;">
+      <div class="reveal-eyebrow" data-i18n="scanToJoin">Scan to join</div>
+      <h2 class="font-display" id="checkinOverlayTitle" style="margin:0 0 18px; font-size:clamp(20px,3vw,26px);">Lucky Draw</h2>
+      <img id="checkinQrImgBig" alt="QR code" style="width:min(300px,66vw); height:auto; border-radius:16px; background:#fff; padding:16px; display:block; margin:0 auto;">
+      <div style="margin-top:16px; font-family:var(--font-mono); font-size:13px; color:var(--dim); word-break:break-all;" id="checkinUrlTextBig"></div>
+      <div style="margin-top:10px; font-size:13px; color:var(--gold-2); font-weight:600;" id="checkinCountBig"></div>
+      <div style="margin-top:8px; font-size:12.5px; color:var(--dim);" id="checkinStatusBig" role="status"></div>
+      <div class="reveal-actions">
+        <button type="button" class="btn btn-gold" id="checkinCloseFullscreenBtn" data-i18n="btnClose">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <canvas id="confettiCanvas"></canvas>
+  <div class="toast-container" id="toastContainer"></div>
+
+</div>
+
+<div id="attendeeRoot"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   0. STORAGE HELPERS (best-effort, never throws)
+   ============================================================ */
+const storage = {
+  get(k, fallback){ try{ const v = localStorage.getItem(k); return v===null ? fallback : JSON.parse(v); }catch(e){ return fallback; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){ /* ignore (private mode / file://) */ } }
+};
+
+/* ============================================================
+   1. I18N
+   ============================================================ */
+const I18N = {
+en:{
+  orgPlaceholder:"Organizer name (optional)",
+  tallyLabel:"Winners", tallySub:"this round",
+  prizeLabel:"Prize", prizeSub:"this round", prizePlaceholder:"e.g. iPhone 15 Pro",
+  boardIdle:"Roster", boardShuffling:"Drawing…",
+  emptyTitle:"No participants yet",
+  emptyBody:"Import your guest list to start the draw — paste a list, upload a CSV/Excel file, or try it with sample data.",
+  btnImport:"Import participants", btnLoadSample:"Load sample data",
+  btnDraw:"DRAW", btnStop:"STOP",
+  footerHint:'Press <kbd>Space</kbd> to draw',
+  settingsTitle:"Settings",
+  tabData:"Participants", tabCheckin:"Check-in", tabBrand:"Branding", tabOptions:"Options", tabHistory:"History",
+  checkinUnavailableMsg:"QR check-in needs the Lucky Draw desktop app — this standalone HTML page can't run a local server. Everything else here still works the same.",
+  labelCheckinOpen:"Accepting check-ins", labelCheckinOpenHelp:"Turn off once registration for this event is done.",
+  labelAllowedDomains:"Restrict to email domains (optional)",
+  labelAllowedDomainsHelp:'Only these can check in. Use ".edu" for any .edu address, or a full domain like "gmail.com" or "binus.ac.id". Separate multiple with commas. Leave blank to allow any email.',
+  btnCopyLink:"Copy link", checkinNetworkHint:"Phones must be on the same Wi-Fi network as this computer. If they can't connect, allow the app through Windows Firewall.",
+  btnShowQrFullscreen:"Show QR fullscreen", btnResetCount:"Reset count",
+  labelCheckinFields:"Form fields", labelCheckinFieldsHelp:"Full name and email are always collected. Add more if you need them, e.g. phone number or table.",
+  labelRequired:"Required", btnAddField:"Add field", newFieldPlaceholder:"e.g. Phone Number",
+  scanToJoin:"Scan to join", btnClose:"Close",
+  checkinCountText:(n)=>`${n} checked in via QR`,
+  toastCheckinCopied:"Link copied to clipboard.",
+  toastCheckinNewPerson:(name)=>`New check-in: ${name}`,
+  toastCheckinFieldNeedsLabel:"Give the field a label first.",
+  toastImportDuplicatesSkipped:(n)=>`${n} duplicate${n===1?'':'s'} skipped.`,
+  toastCheckinCountReset:"Check-in count reset.",
+  toastCheckinNoNetwork:"Couldn't detect a local network address — make sure Wi-Fi is connected.",
+  btnExportParticipants:"Export participants (CSV)", toastParticipantsExported:"Participants exported.",
+  confirmReplaceWithQr:(n)=>`${n} people who checked in via QR are in the current list and will be replaced by this import. Continue?`,
+  labelParticipants:"Participants", noParticipantsMsg:"No participants loaded yet.",
+  participantSummaryText:(n)=>`${n} participant${n===1?'':'s'} loaded and ready to draw.`,
+  labelUpload:"Upload CSV / Excel / TXT",
+  labelOrPaste:"…or paste one participant per line",
+  labelParticipantsHelp:"Format: ID - Name - Category (ID and category are optional — a plain name per line also works).",
+  btnApplyList:"Use this list",
+  btnClearData:"Clear list",
+  labelCurrentList:"Current list",
+  currentListCountText:(n)=>`${n} ${n===1?'person':'people'}`,
+  wonBadge:"WON",
+  btnDownloadTemplate:"Download Excel template",
+  toastTemplateDownloaded:"Template downloaded — fill it in and upload it back here.",
+  toastTemplateFail:"Couldn't build the Excel template, downloaded a CSV version instead.",
+  labelEventTitle:"Event title", labelOrgName:"Organizer / subtitle", labelLogo:"Event logo",
+  btnUploadLogo:"Upload", btnRemove:"Remove",
+  labelBgImage:"Background image", labelBgImageHelp:"Shown behind the whole app. JPG, PNG, or other image types all work.",
+  btnUploadBg:"Upload image", btnRemoveBg:"Remove",
+  toastBgApplied:"Background image applied.",
+  toastBgRemoved:"Background image removed.",
+  toastBgFail:"Couldn't read that image — try a JPG or PNG file.",
+  toastBgProcessing:"Processing image…",
+  labelExcludePrevious:"Remove winners from the pool", labelExcludePreviousHelp:"Off lets the same person be drawn again.",
+  labelSound:"Sound effects", labelSoundHelp:"Plays a short chime on reveal.",
+  labelStopMode:"Draw stop mode",
+  labelStopModeHelp:"Auto-stop reveals the winner for you; manual stop waits for your click every time.",
+  stopModeAuto:"Auto stop", stopModeManual:"Manual stop",
+  labelAutoStopSeconds:"Stop after (seconds)",
+  resetWarning:"Clears all participants and winner history. This can't be undone.",
+  btnReset:"Reset everything",
+  historyEmpty:"No winners yet",
+  historyRoundEditHint:"Click to rename this round's prize",
+  btnExport:"Export CSV",
+  "reveal-eyebrow":"Congratulations",
+  winnerSingular:"Winner", winnerPlural:"Winners",
+  btnContinue:"Continue",
+  statParticipants:"Participants", statRemaining:"Remaining", statWinners:"Drawn",
+  round:"Round",
+  toastListLoaded:(n)=>`${n} participant${n===1?'':'s'} loaded`,
+  toastNoFile:"Couldn't read that file — try a .csv, .txt or .xlsx file.",
+  toastEmptyPaste:"Paste at least one participant first.",
+  toastPoolEmpty:"Everyone has already won! Reset or turn off \u201Cremove winners\u201D to draw again.",
+  toastNoParticipants:"Add participants before drawing.",
+  toastCleared:"Participant list cleared.",
+  toastReset:"Everything has been reset.",
+  toastUndone:"Last draw undone.",
+  toastNothingToUndo:"Nothing to undo yet.",
+  toastLogoTooBig:"That image is quite large — using it anyway, but a smaller logo loads faster.",
+  toastExported:"Winners exported.",
+  toastXlsxLoading:"Reading Excel file…",
+  toastXlsxFail:"Couldn't load the Excel reader. Save the file as CSV and try again.",
+  confirmReset:"This clears all participants and winner history. Continue?",
+  confirmClearData:"Clear the current participant list?",
+  /* --- QR check-in in the standalone page --- */
+  labelPublicUrl:"Public link of this page",
+  labelPublicUrlHelp:"Phones can't open a file saved on this computer. Upload this HTML file to a free web host (Netlify Drop, GitHub Pages or Cloudflare Pages, for example), then paste its link here. You can keep running the draw from this computer.",
+  checkinNeedUrl:"Paste the public link above to create the QR code.",
+  checkinTooLong:"That link is too long for a QR code. Use a shorter link.",
+  checkinWebHint:"Phones only need internet, on any network. Keep this page open while people check in.",
+  btnRetry:"Try again",
+  ckLoading:"Loading the connection tool…",
+  ckConnecting:"Connecting…",
+  ckReady:"Ready. People can scan now.",
+  ckReadyNeedUrl:"Connected. Paste the public link above to show the QR code.",
+  ckReconnecting:"Connection lost. Reconnecting…",
+  ckErrLib:"Couldn't load the connection tool. Check this computer's internet connection.",
+  ckErrIdBusy:"This check-in link is in use by another open copy of this page. Close the other one, then try again.",
+  ckErrServer:"Couldn't reach the connection server. Check the internet connection, then try again.",
+  ckErrUnsupported:"This browser can't run QR check-in. Use a recent Chrome, Edge, Firefox or Safari.",
+  toastCheckinBadUrl:"That link isn't valid. It should start with https://",
+  /* --- the form phones show --- */
+  attConnecting:"Connecting to the event…",
+  attLead:"Enter your details to join the draw.",
+  attName:"Full name", attEmail:"Email", attOptional:"optional",
+  attSubmit:"Check in", attSending:"Sending…",
+  attNameMissing:"Enter your full name.",
+  attEmailInvalid:"Enter a valid email address.",
+  attFieldMissing:(label)=>`${label} is required.`,
+  attDomainHint:(list)=>`Use an email address from: ${list}`,
+  attDomainBody:(list)=>`Only email addresses from ${list} can check in.`,
+  attDoneTitle:"You're checked in",
+  attDoneBody:(name)=>`Thanks, ${name}. You're in the draw. Watch the main screen.`,
+  attAlreadyTitle:"Already checked in",
+  attAlreadyBody:"You're already on the list, so there's nothing more to do.",
+  attClosedTitle:"Check-in is closed",
+  attClosedBody:"The organizer isn't accepting check-ins right now.",
+  attOfflineTitle:"Can't reach the organizer",
+  attOfflineBody:"Make sure the draw page is open and online on the organizer's computer, then try again.",
+  attNetTitle:"Connection problem",
+  attNetBody:"Check your internet connection and try again.",
+  attBadLinkTitle:"This QR link isn't valid",
+  attBadLinkBody:"Scan the QR code on the event screen again.",
+  attSendFail:"Couldn't send your details. Check your connection and try again.",
+},
+id:{
+  orgPlaceholder:"Nama penyelenggara (opsional)",
+  tallyLabel:"Pemenang", tallySub:"undian ini",
+  prizeLabel:"Hadiah", prizeSub:"undian ini", prizePlaceholder:"cth. iPhone 15 Pro",
+  boardIdle:"Daftar Peserta", boardShuffling:"Mengundi…",
+  emptyTitle:"Belum ada peserta",
+  emptyBody:"Impor daftar tamu untuk memulai undian — tempel daftar, unggah file CSV/Excel, atau coba dengan data contoh.",
+  btnImport:"Impor peserta", btnLoadSample:"Muat data contoh",
+  btnDraw:"UNDI", btnStop:"STOP",
+  footerHint:'Tekan <kbd>Spasi</kbd> untuk mengundi',
+  settingsTitle:"Pengaturan",
+  tabData:"Peserta", tabCheckin:"Absensi", tabBrand:"Merek", tabOptions:"Opsi", tabHistory:"Riwayat",
+  checkinUnavailableMsg:"Absensi QR butuh aplikasi desktop Lucky Draw — halaman HTML mandiri ini tidak bisa menjalankan server lokal. Fitur lainnya di sini tetap berfungsi normal.",
+  labelCheckinOpen:"Menerima absensi", labelCheckinOpenHelp:"Matikan setelah pendaftaran untuk acara ini selesai.",
+  labelAllowedDomains:"Batasi ke domain email tertentu (opsional)",
+  labelAllowedDomainsHelp:'Hanya domain ini yang bisa absen. Pakai ".edu" untuk semua email .edu, atau domain lengkap seperti "gmail.com" atau "binus.ac.id". Pisahkan dengan koma jika lebih dari satu. Kosongkan untuk mengizinkan semua email.',
+  btnCopyLink:"Salin tautan", checkinNetworkHint:"HP harus terhubung ke WiFi yang sama dengan komputer ini. Jika tidak bisa terhubung, izinkan aplikasi di Windows Firewall.",
+  btnShowQrFullscreen:"Tampilkan QR layar penuh", btnResetCount:"Atur ulang jumlah",
+  labelCheckinFields:"Kolom formulir", labelCheckinFieldsHelp:"Nama lengkap dan email selalu diminta. Tambahkan kolom lain jika perlu, misalnya nomor HP atau meja.",
+  labelRequired:"Wajib", btnAddField:"Tambah kolom", newFieldPlaceholder:"cth. Nomor HP",
+  scanToJoin:"Scan untuk ikut", btnClose:"Tutup",
+  checkinCountText:(n)=>`${n} orang absen via QR`,
+  toastCheckinCopied:"Tautan disalin ke clipboard.",
+  toastCheckinNewPerson:(name)=>`Peserta baru absen: ${name}`,
+  toastCheckinFieldNeedsLabel:"Beri nama kolom terlebih dahulu.",
+  toastImportDuplicatesSkipped:(n)=>`${n} data duplikat dilewati.`,
+  toastCheckinCountReset:"Jumlah absensi diatur ulang.",
+  toastCheckinNoNetwork:"Tidak dapat menemukan alamat jaringan lokal — pastikan WiFi terhubung.",
+  btnExportParticipants:"Ekspor peserta (CSV)", toastParticipantsExported:"Daftar peserta diekspor.",
+  confirmReplaceWithQr:(n)=>`${n} orang yang absen via QR ada di daftar saat ini dan akan tergantikan oleh impor ini. Lanjutkan?`,
+  labelParticipants:"Peserta", noParticipantsMsg:"Belum ada peserta yang dimuat.",
+  participantSummaryText:(n)=>`${n} peserta dimuat dan siap diundi.`,
+  labelUpload:"Unggah CSV / Excel / TXT",
+  labelOrPaste:"…atau tempel satu peserta per baris",
+  labelParticipantsHelp:"Format: ID - Nama - Kategori (ID dan kategori opsional — nama saja per baris juga bisa).",
+  btnApplyList:"Gunakan daftar ini",
+  btnClearData:"Hapus daftar",
+  labelCurrentList:"Daftar saat ini",
+  currentListCountText:(n)=>`${n} orang`,
+  wonBadge:"MENANG",
+  btnDownloadTemplate:"Unduh template Excel",
+  toastTemplateDownloaded:"Template terunduh — isi lalu unggah kembali di sini.",
+  toastTemplateFail:"Gagal membuat template Excel, mengunduh versi CSV sebagai gantinya.",
+  labelEventTitle:"Judul acara", labelOrgName:"Penyelenggara / subjudul", labelLogo:"Logo acara",
+  btnUploadLogo:"Unggah", btnRemove:"Hapus",
+  labelBgImage:"Gambar latar belakang", labelBgImageHelp:"Ditampilkan di belakang seluruh aplikasi. Format JPG, PNG, atau lainnya semua bisa.",
+  btnUploadBg:"Unggah gambar", btnRemoveBg:"Hapus",
+  toastBgApplied:"Gambar latar belakang diterapkan.",
+  toastBgRemoved:"Gambar latar belakang dihapus.",
+  toastBgFail:"Gambar tidak dapat dibaca — coba file JPG atau PNG.",
+  toastBgProcessing:"Memproses gambar…",
+  labelExcludePrevious:"Keluarkan pemenang dari daftar undian", labelExcludePreviousHelp:"Jika nonaktif, orang yang sama bisa terpilih lagi.",
+  labelSound:"Efek suara", labelSoundHelp:"Memutar bunyi singkat saat pemenang muncul.",
+  labelStopMode:"Mode berhenti undian",
+  labelStopModeHelp:"Auto-stop akan mengungkap pemenang otomatis; stop manual menunggu klik Anda setiap kali.",
+  stopModeAuto:"Berhenti otomatis", stopModeManual:"Berhenti manual",
+  labelAutoStopSeconds:"Berhenti setelah (detik)",
+  resetWarning:"Menghapus semua peserta dan riwayat pemenang. Tidak dapat dibatalkan.",
+  btnReset:"Atur ulang semua",
+  historyEmpty:"Belum ada pemenang",
+  historyRoundEditHint:"Klik untuk mengganti nama hadiah undian ini",
+  btnExport:"Ekspor CSV",
+  "reveal-eyebrow":"Selamat",
+  winnerSingular:"Pemenang", winnerPlural:"Para Pemenang",
+  btnContinue:"Lanjutkan",
+  statParticipants:"Peserta", statRemaining:"Tersisa", statWinners:"Terpilih",
+  round:"Undian",
+  toastListLoaded:(n)=>`${n} peserta dimuat`,
+  toastNoFile:"File tidak dapat dibaca — coba file .csv, .txt atau .xlsx.",
+  toastEmptyPaste:"Tempel minimal satu peserta terlebih dahulu.",
+  toastPoolEmpty:"Semua peserta sudah menang! Atur ulang atau matikan \u201Ckeluarkan pemenang\u201D untuk mengundi lagi.",
+  toastNoParticipants:"Tambahkan peserta sebelum mengundi.",
+  toastCleared:"Daftar peserta dihapus.",
+  toastReset:"Semua telah diatur ulang.",
+  toastUndone:"Undian terakhir dibatalkan.",
+  toastNothingToUndo:"Belum ada yang bisa dibatalkan.",
+  toastLogoTooBig:"Gambar ini cukup besar — tetap digunakan, tapi logo lebih kecil akan lebih cepat dimuat.",
+  toastExported:"Daftar pemenang diekspor.",
+  toastXlsxLoading:"Membaca file Excel…",
+  toastXlsxFail:"Gagal memuat pembaca Excel. Simpan file sebagai CSV lalu coba lagi.",
+  confirmReset:"Ini akan menghapus semua peserta dan riwayat pemenang. Lanjutkan?",
+  confirmClearData:"Hapus daftar peserta saat ini?",
+  /* --- Absensi QR di halaman mandiri --- */
+  labelPublicUrl:"Tautan publik halaman ini",
+  labelPublicUrlHelp:"HP tidak bisa membuka file yang tersimpan di komputer ini. Unggah file HTML ini ke hosting web gratis (misalnya Netlify Drop, GitHub Pages, atau Cloudflare Pages), lalu tempel tautannya di sini. Undian tetap bisa dijalankan dari komputer ini.",
+  checkinNeedUrl:"Tempel tautan publik di atas untuk membuat kode QR.",
+  checkinTooLong:"Tautan terlalu panjang untuk kode QR. Gunakan tautan yang lebih pendek.",
+  checkinWebHint:"HP hanya perlu internet, jaringan apa saja bisa. Biarkan halaman ini tetap terbuka selama absensi berlangsung.",
+  btnRetry:"Coba lagi",
+  ckLoading:"Memuat alat koneksi…",
+  ckConnecting:"Menghubungkan…",
+  ckReady:"Siap. Peserta sudah bisa scan.",
+  ckReadyNeedUrl:"Terhubung. Tempel tautan publik di atas untuk menampilkan kode QR.",
+  ckReconnecting:"Koneksi terputus. Menyambung ulang…",
+  ckErrLib:"Alat koneksi gagal dimuat. Periksa koneksi internet komputer ini.",
+  ckErrIdBusy:"Tautan absensi ini sedang dipakai salinan halaman lain yang masih terbuka. Tutup yang lain, lalu coba lagi.",
+  ckErrServer:"Tidak bisa terhubung ke server koneksi. Periksa koneksi internet, lalu coba lagi.",
+  ckErrUnsupported:"Browser ini tidak bisa menjalankan absensi QR. Gunakan Chrome, Edge, Firefox, atau Safari versi terbaru.",
+  toastCheckinBadUrl:"Tautan tidak valid. Harus diawali https://",
+  /* --- form yang tampil di HP --- */
+  attConnecting:"Menghubungkan ke acara…",
+  attLead:"Isi data Anda untuk ikut undian.",
+  attName:"Nama lengkap", attEmail:"Email", attOptional:"opsional",
+  attSubmit:"Absen sekarang", attSending:"Mengirim…",
+  attNameMissing:"Isi nama lengkap Anda.",
+  attEmailInvalid:"Masukkan alamat email yang valid.",
+  attFieldMissing:(label)=>`${label} wajib diisi.`,
+  attDomainHint:(list)=>`Gunakan email dari: ${list}`,
+  attDomainBody:(list)=>`Hanya email dari ${list} yang bisa absen.`,
+  attDoneTitle:"Absensi berhasil",
+  attDoneBody:(name)=>`Terima kasih, ${name}. Anda sudah masuk daftar undian. Pantau layar utama.`,
+  attAlreadyTitle:"Sudah absen",
+  attAlreadyBody:"Anda sudah ada di daftar, jadi tidak perlu absen lagi.",
+  attClosedTitle:"Absensi ditutup",
+  attClosedBody:"Penyelenggara sedang tidak menerima absensi.",
+  attOfflineTitle:"Tidak bisa terhubung ke penyelenggara",
+  attOfflineBody:"Pastikan halaman undian terbuka dan online di komputer penyelenggara, lalu coba lagi.",
+  attNetTitle:"Masalah koneksi",
+  attNetBody:"Periksa koneksi internet Anda lalu coba lagi.",
+  attBadLinkTitle:"Tautan QR ini tidak valid",
+  attBadLinkBody:"Scan ulang kode QR di layar acara.",
+  attSendFail:"Data gagal terkirim. Periksa koneksi Anda lalu coba lagi.",
+}
+};
+
+let lang = storage.get('dp_lang','en');
+function t(key, ...args){
+  const dict = I18N[lang] || I18N.en;
+  const val = dict[key] !== undefined ? dict[key] : (I18N.en[key] !== undefined ? I18N.en[key] : key);
+  return typeof val === 'function' ? val(...args) : val;
+}
+
+/* ============================================================
+   1b. CHECK-IN HELPERS + PHONE (ATTENDEE) MODE
+   A phone that scans the QR opens this same file with ?checkin=<id>.
+   In that mode only the small check-in form is shown, and the details
+   travel browser-to-browser (WebRTC through PeerJS) to the organizer's
+   copy of the page, which stays the single source of truth.
+   ============================================================ */
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function emailDomainAllowed(email, list){
+  const s = String(email);
+  const dom = s.slice(s.lastIndexOf('@')+1).toLowerCase();
+  return list.some(entry=>{
+    const d = String(entry).trim().toLowerCase().replace(/^@/,'');
+    if(!d) return false;
+    return d.charAt(0)==='.' ? dom.endsWith(d) : (dom===d || dom.endsWith('.'+d));
+  });
+}
+
+const PEER_LIB_URLS = [
+  'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js',
+  'https://cdnjs.cloudflare.com/ajax/libs/peerjs/1.5.4/peerjs.min.js',
+  'https://cdn.jsdelivr.net/npm/peerjs@1/dist/peerjs.min.js'
+];
+let peerLibPromise = null;
+function loadScriptOnce(src){
+  return new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = src; s.async = true;
+    const timer = setTimeout(()=>{ s.remove(); reject(new Error('timeout')); }, 10000);
+    s.onload = ()=>{ clearTimeout(timer); resolve(); };
+    s.onerror = ()=>{ clearTimeout(timer); s.remove(); reject(new Error('load failed')); };
+    document.head.appendChild(s);
+  });
+}
+function loadPeerLib(){
+  if(window.Peer) return Promise.resolve(window.Peer);
+  if(peerLibPromise) return peerLibPromise;
+  peerLibPromise = (async()=>{
+    for(const url of PEER_LIB_URLS){
+      try{ await loadScriptOnce(url); if(window.Peer) return window.Peer; }catch(e){ /* try the next mirror */ }
+    }
+    peerLibPromise = null;
+    throw new Error('PeerJS unavailable');
+  })();
+  return peerLibPromise;
+}
+
+function runAttendee(hostId){
+  document.documentElement.setAttribute('data-mode', 'attendee');
+  const root = document.getElementById('attendeeRoot');
+  root.innerHTML = '<div class="att-card" id="attCard" aria-live="polite"></div>';
+  const card = document.getElementById('attCard');
+  const e = escapeHtml;
+  lang = /^id\b/i.test(navigator.language || '') ? 'id' : 'en';
+  document.documentElement.lang = lang;
+
+  let cfg = null, logo = '', peer = null, conn = null;
+  let view = 'connecting', connTimer = null, sendTimer = null, done = false;
+  const values = {};
+
+  const SVG = (inner)=>'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'+inner+'</svg>';
+  const ICONS = {
+    ok:   SVG('<path d="M5 12.5l4.5 4.5L19 7.5"/>'),
+    warn: SVG('<path d="M12 7v6"/><path d="M12 17h.01"/>'),
+    bad:  SVG('<path d="M7 7l10 10M17 7L7 17"/>')
+  };
+
+  function busyView(msg){
+    view = 'connecting';
+    card.innerHTML = '<div class="att-state"><div class="att-spin" aria-hidden="true"></div><p class="att-body">'+e(msg)+'</p></div>';
+  }
+  function stateView(kind, title, body, retry){
+    card.innerHTML =
+      '<div class="att-state '+kind+'">'+
+        '<div class="att-icon">'+ICONS[kind]+'</div>'+
+        '<h1 class="att-title">'+e(title)+'</h1>'+
+        '<p class="att-body">'+e(body)+'</p>'+
+        (retry ? '<button type="button" class="att-btn" id="attRetry">'+e(t('btnRetry'))+'</button>' : '')+
+      '</div>';
+    if(retry) document.getElementById('attRetry').addEventListener('click', retry);
+  }
+  function failView(kind){
+    view = 'error';
+    clearTimeout(connTimer); clearTimeout(sendTimer);
+    teardown();
+    if(kind === 'offline') stateView('bad', t('attOfflineTitle'), t('attOfflineBody'), start);
+    else stateView('bad', t('attNetTitle'), t('attNetBody'), start);
+  }
+
+  function teardown(){
+    try{ if(conn) conn.close(); }catch(x){}
+    try{ if(peer) peer.destroy(); }catch(x){}
+    conn = null; peer = null;
+  }
+
+  function fieldDefs(){
+    const base = [
+      { id:'name',  label:t('attName'),  type:'text',  ac:'name',  req:true, max:80 },
+      { id:'email', label:t('attEmail'), type:'email', ac:'email', req:true, max:120 }
+    ];
+    const more = (cfg.fields||[]).map(f=>({ id:'x:'+f.key, key:f.key, label:f.label, type:'text', ac:'off', req:!!f.required, max:120 }));
+    return base.concat(more);
+  }
+
+  function formView(errors, banner){
+    view = 'form';
+    errors = errors || {};
+    const defs = fieldDefs();
+    const doms = cfg.domains || [];
+    card.innerHTML =
+      '<div class="att-head">'+
+        (logo ? '<img class="att-logo" alt="" src="'+e(logo)+'">' : '')+
+        '<h1 class="att-title">'+e(cfg.title || '')+'</h1>'+
+        '<p class="att-lead">'+e(t('attLead'))+'</p>'+
+      '</div>'+
+      '<form id="attForm" novalidate>'+
+        (banner ? '<div class="att-alert" role="alert">'+e(banner)+'</div>' : '')+
+        defs.map((f,i)=>
+          '<div class="att-field'+(errors[f.id]?' invalid':'')+'">'+
+            '<label for="att_f'+i+'">'+e(f.label)+(f.req ? '' : '<span class="opt">'+e(t('attOptional'))+'</span>')+'</label>'+
+            '<input id="att_f'+i+'" name="'+e(f.id)+'" type="'+f.type+'"'+
+              (f.id==='email' ? ' inputmode="email" autocapitalize="none" spellcheck="false"' : '')+
+              ' autocomplete="'+f.ac+'" maxlength="'+f.max+'" value="'+e(values[f.id]||'')+'"'+
+              (f.req ? ' required aria-required="true"' : '')+
+              (errors[f.id] ? ' aria-invalid="true"' : '')+'>'+
+            (f.id==='email' && doms.length && errors.email !== t('attDomainBody', doms.join(', ')) ? '<div class="att-hint">'+e(t('attDomainHint', doms.join(', ')))+'</div>' : '')+
+            (errors[f.id] ? '<div class="att-error">'+e(errors[f.id])+'</div>' : '')+
+          '</div>'
+        ).join('')+
+        '<button type="submit" class="att-btn" id="attSubmit">'+e(t('attSubmit'))+'</button>'+
+      '</form>';
+    card.querySelectorAll('.att-field input').forEach(inp=>{
+      inp.addEventListener('input', ()=>{ values[inp.name] = inp.value; });
+    });
+    document.getElementById('attForm').addEventListener('submit', (ev)=>{ ev.preventDefault(); submit(); });
+    const firstBad = card.querySelector('.att-field.invalid input');
+    if(firstBad) firstBad.focus();
+  }
+
+  function submit(){
+    // read straight from the inputs too: browser autofill doesn't always fire "input"
+    card.querySelectorAll('.att-field input').forEach(inp=>{ values[inp.name] = inp.value; });
+    const defs = fieldDefs();
+    const errors = {};
+    defs.forEach(f=>{
+      const v = String(values[f.id]||'').trim();
+      if(f.req && !v){
+        errors[f.id] = f.id==='name' ? t('attNameMissing') : f.id==='email' ? t('attEmailInvalid') : t('attFieldMissing', f.label);
+      }
+    });
+    const email = String(values.email||'').trim();
+    if(!errors.email && email){
+      const doms = cfg.domains || [];
+      if(!EMAIL_RE.test(email)) errors.email = t('attEmailInvalid');
+      else if(doms.length && !emailDomainAllowed(email, doms)) errors.email = t('attDomainBody', doms.join(', '));
+    }
+    if(Object.keys(errors).length){ formView(errors); return; }
+
+    const payload = { t:'checkin', name:String(values.name).trim(), email:email, extra:{} };
+    defs.forEach(f=>{ if(f.key){ const v = String(values[f.id]||'').trim(); if(v) payload.extra[f.key] = v; } });
+
+    busyView(t('attSending'));
+    view = 'sending';
+    getConn().then(c=>{
+      c.send(JSON.stringify(payload));
+      clearTimeout(sendTimer);
+      sendTimer = setTimeout(()=>{ if(view==='sending') formView({}, t('attSendFail')); }, 15000);
+    }).catch(()=>{ formView({}, t('attSendFail')); });
+  }
+
+  function onConfig(m){
+    clearTimeout(connTimer);
+    const prev = cfg ? JSON.stringify(cfg) : '';
+    cfg = {
+      open: m.open !== false,
+      title: String(m.title || '').slice(0, 120),
+      lang: m.lang === 'id' ? 'id' : 'en',
+      fields: (Array.isArray(m.fields) ? m.fields : []).slice(0, 12)
+                .map(f=>({ key:String((f&&f.key)||''), label:String((f&&f.label)||'').slice(0, 60), required:!!(f&&f.required) }))
+                .filter(f=>f.key && f.label),
+      domains: (Array.isArray(m.domains) ? m.domains : []).slice(0, 15).map(d=>String(d).slice(0, 80))
+    };
+    lang = cfg.lang;
+    document.documentElement.lang = lang;
+    if(cfg.title) document.title = cfg.title;
+    if(done || view==='sending') return;
+    if(!cfg.open){ view = 'closed'; stateView('warn', t('attClosedTitle'), t('attClosedBody')); return; }
+    if(view==='form' && prev === JSON.stringify(cfg)) return;
+    formView();
+  }
+
+  function onResult(m){
+    clearTimeout(sendTimer);
+    if(m.ok){
+      done = true; view = 'done';
+      teardown();
+      if(m.status === 'already') stateView('warn', t('attAlreadyTitle'), t('attAlreadyBody'));
+      else stateView('ok', t('attDoneTitle'), t('attDoneBody', String(values.name||'').trim()));
+      return;
+    }
+    if(m.code === 'closed'){ view = 'closed'; stateView('warn', t('attClosedTitle'), t('attClosedBody')); return; }
+    if(m.code === 'domain'){ formView({ email: t('attDomainBody', ((cfg&&cfg.domains)||[]).join(', ')) }); return; }
+    if(m.code === 'invalid'){
+      const id = m.field==='name' || m.field==='email' ? m.field : 'x:'+m.field;
+      const f = fieldDefs().filter(d=>d.id===id)[0];
+      const msg = id==='name' ? t('attNameMissing') : id==='email' ? t('attEmailInvalid') : t('attFieldMissing', f ? f.label : '');
+      const errs = {}; errs[id] = msg;
+      formView(errs);
+      return;
+    }
+    formView({}, t('attSendFail'));
+  }
+
+  function onData(raw){
+    let m;
+    try{ m = typeof raw === 'string' ? JSON.parse(raw) : raw; }catch(x){ return; }
+    if(!m || typeof m !== 'object') return;
+    if(m.t === 'config') onConfig(m);
+    else if(m.t === 'result') onResult(m);
+    else if(m.t === 'logo'){
+      if(typeof m.data === 'string' && /^data:image\/(png|jpe?g|gif|webp|svg\+xml);/i.test(m.data)){
+        logo = m.data;
+        const head = card.querySelector('.att-head');
+        if(head && !head.querySelector('.att-logo')){
+          const img = document.createElement('img');
+          img.className = 'att-logo'; img.alt = ''; img.src = logo;
+          head.insertBefore(img, head.firstChild);
+        }
+      }
+    }
+  }
+
+  /* Resolves with an open data connection to the organizer's page. */
+  function getConn(){
+    if(conn && conn.open) return Promise.resolve(conn);
+    return loadPeerLib().then(Peer=>new Promise((resolve, reject)=>{
+      let settled = false;
+      const to = setTimeout(()=>no('offline'), 20000);
+      const ok = (c)=>{ if(settled) return; settled = true; clearTimeout(to); resolve(c); };
+      const no = (kind)=>{ if(settled) return; settled = true; clearTimeout(to); reject({ kind:kind }); };
+      const dial = ()=>{
+        const c = peer.connect(hostId, { reliable:true });
+        c.on('data', onData);
+        c.on('open', ()=>{ conn = c; ok(c); });
+        c.on('error', ()=>no('offline'));
+        c.on('close', ()=>{ if(conn === c) conn = null; });
+      };
+      if(peer && !peer.destroyed && !peer.disconnected && peer.open){ dial(); return; }
+      try{ if(peer) peer.destroy(); }catch(x){}
+      peer = new Peer();
+      peer.on('open', dial);
+      peer.on('error', (err)=>no(err && err.type === 'peer-unavailable' ? 'offline' : 'net'));
+    }), ()=>{ throw { kind:'net' }; });
+  }
+
+  function start(){
+    busyView(t('attConnecting'));
+    clearTimeout(connTimer);
+    getConn().then(()=>{
+      clearTimeout(connTimer);
+      connTimer = setTimeout(()=>{ if(!cfg) failView('offline'); }, 12000);
+    }).catch(err=>failView(err && err.kind ? err.kind : 'net'));
+  }
+
+  if(!/^[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(hostId)){
+    stateView('bad', t('attBadLinkTitle'), t('attBadLinkBody'));
+    return;
+  }
+  start();
+}
+
+const ATTENDEE_PARAM = (function(){ try{ return new URLSearchParams(location.search).get('checkin'); }catch(e){ return null; } })();
+if(ATTENDEE_PARAM !== null){ runAttendee(ATTENDEE_PARAM); return; }
+
+
+/* ============================================================
+   2. STATE
+   ============================================================ */
+const SAMPLE_NAMES = [
+  ["Amelia Putri","Guest"], ["Bagus Santoso","Guest"], ["Citra Wulandari","Staff"],
+  ["Dimas Aditya","Guest"], ["Elena Kusuma","Sponsor"], ["Farhan Nugraha","Guest"],
+  ["Gita Permata","Staff"], ["Hendra Wijaya","Guest"], ["Indah Lestari","Guest"],
+  ["Joko Prasetyo","Sponsor"], ["Kirana Ayu","Guest"], ["Lukman Hakim","Staff"],
+  ["Maya Anggraini","Guest"], ["Naufal Rizky","Guest"], ["Olivia Chen","Sponsor"],
+  ["Prasetyo Wibowo","Guest"], ["Qonita Salsabila","Staff"], ["Reza Firmansyah","Guest"],
+  ["Siti Nurhaliza","Guest"], ["Tegar Alamsyah","Sponsor"], ["Umi Kalsum","Guest"],
+  ["Vino Bastian","Staff"], ["Wulan Guritno","Guest"], ["Xaviera Putri","Guest"],
+  ["Yusuf Mansur","Sponsor"], ["Zahra Amalia","Guest"], ["Andra Ramadhan","Guest"],
+  ["Bella Safira","Staff"], ["Cahyo Nugroho","Guest"], ["Dewi Sartika","Guest"]
+];
+
+const state = {
+  participants: storage.get('dp_participants', []),
+  winners: storage.get('dp_winners', []),
+  winnersPerRound: storage.get('dp_wpr', 1),
+  currentPrizeName: storage.get('dp_prizeName', ''),
+  excludePrevious: storage.get('dp_exclude', true),
+  soundOn: storage.get('dp_sound', true),
+  stopMode: storage.get('dp_stop_mode', 'auto'), // 'auto' | 'manual'
+  autoStopSeconds: storage.get('dp_autostop_secs', 8),
+  eventTitle: storage.get('dp_title', lang==='id' ? 'Undian Doorprize' : 'Lucky Draw'),
+  eventOrg: storage.get('dp_org', ''),
+  logoDataUrl: storage.get('dp_logo', null),
+  checkinFields: storage.get('dp_checkin_fields', []),
+  checkinOpen: storage.get('dp_checkin_open', true),
+  checkinAllowedDomains: storage.get('dp_checkin_domains', []),
+  bgImageDataUrl: storage.get('dp_bg', null),
+  theme: storage.get('dp_theme', 'light'),
+  page: 0,
+  drawing: false,
+  shuffleTimer: null,
+  autoStopTimer: null,
+  lastRoundWinnerIds: null, // for undo
+};
+
+function pool(){
+  if(!state.excludePrevious) return state.participants;
+  const wonIds = new Set(state.winners.map(w=>w.pid));
+  return state.participants.filter(p=>!wonIds.has(p.pid));
+}
+
+function persistCore(){
+  storage.set('dp_participants', state.participants);
+  storage.set('dp_winners', state.winners);
+  storage.set('dp_wpr', state.winnersPerRound);
+}
+
+/* ============================================================
+   3. PARSING
+   ============================================================ */
+let pidCounter = 1;
+function makePid(){ return 'p'+(pidCounter++)+'_'+Math.random().toString(36).slice(2,7); }
+
+/* Shared duplicate-detection: matches by email first (most reliable), then by
+   external ID, then falls back to an exact name match only when neither side
+   has an email to disambiguate. Mirrors the check the local check-in server
+   runs so behavior is consistent everywhere a participant can be added. */
+function normKey(s){ return String(s||'').trim().toLowerCase(); }
+function isDuplicateParticipant(candidate, list){
+  const email = normKey(candidate.email);
+  const id = normKey(candidate.id);
+  const name = normKey(candidate.name);
+  return list.some(p=>{
+    const pEmail = normKey(p.email);
+    const pId = normKey(p.id);
+    const pName = normKey(p.name);
+    if(email && pEmail && email===pEmail) return true;
+    if(id && pId && id===pId) return true;
+    if(!email && !pEmail && name && pName && name===pName) return true;
+    return false;
+  });
+}
+function dedupeBatch(list){
+  const kept = [];
+  let skipped = 0;
+  list.forEach(p=>{
+    if(isDuplicateParticipant(p, kept)) skipped++;
+    else kept.push(p);
+  });
+  return { list: kept, skipped };
+}
+
+function parseLine(line){
+  const raw = line.trim();
+  if(!raw) return null;
+  const parts = raw.split(/\s+-\s+/).map(s=>s.trim()).filter(Boolean);
+  let id='', name='', cat='';
+  if(parts.length >= 3){ id = parts[0]; name = parts[1]; cat = parts.slice(2).join(' - '); }
+  else if(parts.length === 2){
+    // ambiguous: "ID - Name" or "Name - Category". Treat first token as ID only if it looks like a code.
+    if(/^[A-Za-z]{0,4}\d{2,}$/.test(parts[0])){ id = parts[0]; name = parts[1]; }
+    else { name = parts[0]; cat = parts[1]; }
+  } else {
+    name = parts[0] || raw;
+  }
+  if(!name) return null;
+  return { pid: makePid(), id, name, cat };
+}
+
+function parseBulkText(text){
+  return text.split(/\r?\n/).map(parseLine).filter(Boolean);
+}
+
+function parseCsvText(text){
+  const lines = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean);
+  if(!lines.length) return [];
+  const splitCsv = (l)=> l.split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+  const header = splitCsv(lines[0]).map(h=>h.toLowerCase());
+  const idIdx = header.findIndex(h=>/^id$|^no$|number/.test(h));
+  const nameIdx = header.findIndex(h=>/name|nama/.test(h));
+  const catIdx = header.findIndex(h=>/cat|kategori|group|division|dept/.test(h));
+  const emailIdx = header.findIndex(h=>/email|e-mail/.test(h));
+  const hasHeader = nameIdx !== -1;
+  const startAt = hasHeader ? 1 : 0;
+  const out = [];
+  for(let i=startAt;i<lines.length;i++){
+    const cols = splitCsv(lines[i]);
+    if(!cols.length || !cols.join('')) continue;
+    let id='', name='', cat='', email='';
+    if(hasHeader){
+      id = idIdx!==-1 ? (cols[idIdx]||'') : '';
+      name = cols[nameIdx]||'';
+      cat = catIdx!==-1 ? (cols[catIdx]||'') : '';
+      email = emailIdx!==-1 ? (cols[emailIdx]||'') : '';
+    } else {
+      if(cols.length>=3){ id=cols[0]; name=cols[1]; cat=cols.slice(2).join(' '); }
+      else if(cols.length===2){ id=cols[0]; name=cols[1]; }
+      else { name=cols[0]; }
+    }
+    if(name) out.push({ pid: makePid(), id, name, cat, email });
+  }
+  return out;
+}
+
+function setParticipants(list, announce){
+  const qrCount = state.participants.filter(p=>p.source==='qr').length;
+  if(qrCount>0 && !confirm(t('confirmReplaceWithQr', qrCount))) return;
+  const { list: deduped, skipped } = dedupeBatch(list);
+  state.participants = deduped;
+  state.winners = []; // fresh import resets winner history to avoid mismatched pids
+  persistCore();
+  renderAll();
+  syncParticipantsToMain();
+  if(announce){
+    toast(t('toastListLoaded', deduped.length));
+    if(skipped>0) toast(t('toastImportDuplicatesSkipped', skipped), true);
+  }
+}
+
+/* ============================================================
+   4. RENDERING
+   ============================================================ */
+const el = (id)=>document.getElementById(id);
+const boardLeft = el('rosterLeft'), boardRight = el('rosterRight');
+const ticketBoardEl = el('ticketBoard');
+const ROWS_PER_COL = 11;
+
+function rowHtml(p, opts){
+  opts = opts || {};
+  const cls = 'roster-row' + (opts.spin ? ' spin' : '') + (opts.placeholder ? ' placeholder' : '');
+  return `<div class="${cls}">
+    ${p.id ? `<span class="rid">${escapeHtml(p.id)}</span>` : ''}
+    <span class="rname">${escapeHtml(p.name)}</span>
+    ${p.cat ? `<span class="rcat">${escapeHtml(p.cat)}</span>` : ''}
+  </div>`;
+}
+function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function showBoard(){ ticketBoardEl.style.display = 'flex'; }
+function hideBoard(){ ticketBoardEl.style.display = 'none'; }
+
+// The roster board no longer sits on the idle stage — it only appears while
+// a draw is actively shuffling (see startDraw/closeOverlay). At rest, this
+// just governs the "no participants" hint and keeps the Settings > Participants
+// list view in sync.
+function renderBoard(){
+  const hint = el('noParticipantsHint');
+  if(state.participants.length === 0){
+    hint.style.display = 'flex';
+    el('drawBtn').disabled = true;
+  } else {
+    hint.style.display = 'none';
+    el('drawBtn').disabled = false;
+  }
+  renderParticipantListView();
+}
+
+function renderParticipantListView(){
+  const container = el('participantListView');
+  const countLabel = el('currentListCount');
+  if(!container) return;
+  if(!state.participants.length){
+    container.innerHTML = `<div class="plv-empty">${t('noParticipantsMsg')}</div>`;
+    countLabel.textContent = '';
+    return;
+  }
+  countLabel.textContent = t('currentListCountText', state.participants.length);
+  const wonIds = new Set(state.winners.map(w=>w.pid));
+  container.innerHTML = state.participants.map(p=>{
+    const won = wonIds.has(p.pid);
+    return `<div class="plv-item${won?' won':''}">
+      ${p.id ? `<span class="plv-id">${escapeHtml(p.id)}</span>` : ''}
+      <span class="plv-name">${escapeHtml(p.name)}</span>
+      ${p.email ? `<span class="plv-email">${escapeHtml(p.email)}</span>` : ''}
+      ${p.cat ? `<span class="plv-cat">${escapeHtml(p.cat)}</span>` : ''}
+      ${won ? `<span class="plv-won-badge">${escapeHtml(t('wonBadge'))}</span>` : ''}
+      ${extraLine(p)}
+    </div>`;
+  }).join('');
+}
+function extraLine(p){
+  const entries = Object.entries(p.extra||{}).filter(([k,v])=>String(v||'').trim());
+  if(!entries.length) return '';
+  return `<div class="plv-extra">${entries.map(([k,v])=>`${escapeHtml(k)}: ${escapeHtml(v)}`).join(' · ')}</div>`;
+}
+
+function renderStats(){
+  const total = state.participants.length;
+  const remaining = pool().length;
+  const won = state.winners.length;
+  el('statsRow').innerHTML = `
+    <span class="stat-pill"><span class="swatch" style="background:var(--mint)"></span>${t('statParticipants')} <b>${total}</b></span>
+    <span class="stat-pill"><span class="swatch" style="background:var(--gold)"></span>${t('statRemaining')} <b>${remaining}</b></span>
+    <span class="stat-pill"><span class="swatch" style="background:var(--ember)"></span>${t('statWinners')} <b>${won}</b></span>
+  `;
+  el('participantSummary').textContent = total>0 ? t('participantSummaryText', total) : t('noParticipantsMsg');
+}
+
+function renderHistory(){
+  const list = el('historyList');
+  const label = el('historyCountLabel');
+  if(!state.winners.length){
+    list.innerHTML = `<div class="history-empty">${t('historyEmpty')}</div>`;
+    label.textContent = t('historyEmpty');
+    return;
+  }
+  label.textContent = `${state.winners.length} ${t('statWinners').toLowerCase()}`;
+  const rounds = {};
+  state.winners.forEach(w=>{ (rounds[w.round] = rounds[w.round]||[]).push(w); });
+  let html='';
+  Object.keys(rounds).sort((a,b)=>a-b).forEach(r=>{
+    const group = rounds[r];
+    const roundLabel = (group[0].prizeName||'').trim() || `${t('round')} ${r}`;
+    html += `<div class="history-round" contenteditable="true" spellcheck="false" data-round="${r}" title="${escapeHtml(t('historyRoundEditHint'))}">${escapeHtml(roundLabel)}</div>`;
+    group.forEach((w)=>{
+      html += `<div class="history-item">
+        <div class="num">${state.winners.indexOf(w)+1}</div>
+        <div class="info"><div class="name">${escapeHtml(w.name)}</div><div class="meta">${escapeHtml(w.id||'')}${w.cat ? ' · '+escapeHtml(w.cat) : ''}</div></div>
+      </div>`;
+    });
+  });
+  list.innerHTML = html;
+}
+
+// Renaming a round label in History updates the prize name for every
+// winner in that round (event delegation, since the list re-renders often).
+el('historyList').addEventListener('keydown', (e)=>{
+  if(e.target.classList.contains('history-round') && e.key==='Enter'){ e.preventDefault(); e.target.blur(); }
+});
+el('historyList').addEventListener('focusin', (e)=>{
+  if(e.target.classList.contains('history-round')) e.target.dataset.editing = '1';
+});
+el('historyList').addEventListener('blur', (e)=>{
+  if(!e.target.classList || !e.target.classList.contains('history-round')) return;
+  const r = Number(e.target.dataset.round);
+  const newName = e.target.textContent.trim();
+  const fallback = `${t('round')} ${r}`;
+  const finalName = (newName && newName !== fallback) ? newName : '';
+  state.winners.forEach(w=>{ if(w.round === r) w.prizeName = finalName; });
+  persistCore();
+  renderHistory();
+}, true);
+
+function renderBranding(){
+  el('eventTitle').textContent = state.eventTitle;
+  el('eventOrg').textContent = state.eventOrg || '';
+  document.title = state.eventTitle + ' — Doorprize';
+  el('titleInput').value = state.eventTitle;
+  el('orgInput').value = state.eventOrg;
+  const badge = el('brandBadge');
+  const preview = el('logoPreview');
+  if(state.logoDataUrl){
+    badge.innerHTML = `<img src="${state.logoDataUrl}" alt="">`;
+    preview.src = state.logoDataUrl; preview.style.display='block';
+  } else {
+    badge.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="#0A0E1F" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2V7z"/><path d="M12 22V7M12 7c-1.5-3-5-4-5-1.5S9 7 12 7zm0 0c1.5-3 5-4 5-1.5S15 7 12 7z"/></svg>`;
+    preview.removeAttribute('src'); preview.style.display='none';
+  }
+  const bgPreview = el('bgPreview'), bgWrap = el('bgPreviewWrap');
+  if(state.bgImageDataUrl){
+    bgPreview.src = state.bgImageDataUrl; bgWrap.style.display='block';
+  } else {
+    bgPreview.removeAttribute('src'); bgWrap.style.display='none';
+  }
+  applyBackground();
+  syncBrandingToMain();
+}
+
+function applyBackground(){
+  const layer = el('bgImageLayer'), scrim = el('bgScrim');
+  if(state.bgImageDataUrl){
+    layer.style.backgroundImage = `url("${state.bgImageDataUrl}")`;
+    layer.classList.add('active');
+    scrim.classList.add('active');
+  } else {
+    layer.style.backgroundImage = '';
+    layer.classList.remove('active');
+    scrim.classList.remove('active');
+  }
+}
+
+/* Downscale + re-encode any uploaded image (jpg/png/webp/gif/etc.) into a
+   compact JPEG data URL via canvas, so large photos don't blow past
+   localStorage limits regardless of the original file size or format. */
+function compressImageFile(file, maxDim, quality){
+  return new Promise((resolve, reject)=>{
+    const reader = new FileReader();
+    reader.onload = (ev)=>{
+      const img = new Image();
+      img.onload = ()=>{
+        let { width, height } = img;
+        if(width > maxDim || height > maxDim){
+          const scale = maxDim / Math.max(width, height);
+          width = Math.round(width*scale); height = Math.round(height*scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const cctx = canvas.getContext('2d');
+        cctx.drawImage(img, 0, 0, width, height);
+        try{ resolve(canvas.toDataURL('image/jpeg', quality)); }
+        catch(err){ reject(err); }
+      };
+      img.onerror = reject;
+      img.src = ev.target.result;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function renderControls(){
+  const tallyInput = el('tallyCount');
+  if(document.activeElement !== tallyInput) tallyInput.value = state.winnersPerRound;
+  el('excludeToggle').checked = state.excludePrevious;
+  el('soundToggle').checked = state.soundOn;
+  updateSoundIcon();
+  el('undoBtn').disabled = !state.lastRoundWinnerIds;
+  el('tallyMinus').disabled = state.winnersPerRound<=1;
+  const maxPick = Math.max(1, pool().length || 20);
+  el('tallyPlus').disabled = state.winnersPerRound>=Math.min(20,maxPick===0?1:99);
+  const prizeInput = el('prizeNameInput');
+  if(document.activeElement !== prizeInput) prizeInput.value = state.currentPrizeName;
+  prizeInput.placeholder = t('prizePlaceholder');
+
+  document.querySelectorAll('.segmented-btn[data-stop-mode]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.stopMode === state.stopMode);
+  });
+  const secondsRow = el('autoStopSecondsRow');
+  secondsRow.style.display = state.stopMode === 'auto' ? 'flex' : 'none';
+  const secondsInput = el('autoStopSeconds');
+  if(document.activeElement !== secondsInput) secondsInput.value = state.autoStopSeconds;
+}
+
+function applyI18nStatic(){
+  document.documentElement.lang = lang;
+  document.documentElement.dataset.lang = lang;
+  document.querySelectorAll('[data-i18n]').forEach(node=>{
+    const key = node.getAttribute('data-i18n');
+    node.innerHTML = t(key);
+  });
+  document.querySelectorAll('[data-lang-btn]').forEach(b=>{
+    b.classList.toggle('active', b.dataset.langBtn===lang);
+  });
+  el('eventOrg').setAttribute('data-placeholder', t('orgPlaceholder'));
+  if(!state.eventOrg){ el('eventOrg').innerHTML = ''; }
+}
+
+function renderAll(){
+  applyI18nStatic();
+  renderBranding();
+  renderControls();
+  renderBoard();
+  renderStats();
+  renderHistory();
+  try{ if(checkinStatusCache) applyCheckinStatusToUI(); }catch(e){}
+}
+
+/* ============================================================
+   5. TOASTS
+   ============================================================ */
+function toast(msg, warn){
+  const c = el('toastContainer');
+  const node = document.createElement('div');
+  node.className = 'toast'+(warn?' warn':'');
+  node.innerHTML = `<span class="dot"></span><span>${escapeHtml(msg)}</span>`;
+  c.appendChild(node);
+  requestAnimationFrame(()=>node.classList.add('show'));
+  setTimeout(()=>{ node.classList.remove('show'); setTimeout(()=>node.remove(), 300); }, 3200);
+}
+
+/* ============================================================
+   6. AUDIO (synthesized, no external files)
+   ============================================================ */
+let audioCtx = null;
+function ensureAudio(){ if(!audioCtx){ try{ audioCtx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } return audioCtx; }
+function playChime(){
+  if(!state.soundOn) return;
+  const ctx = ensureAudio(); if(!ctx) return;
+  const notes = [523.25, 659.25, 783.99, 1046.5]; // C5 E5 G5 C6
+  const now = ctx.currentTime;
+  notes.forEach((freq,i)=>{
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type='sine'; osc.frequency.value=freq;
+    const start = now + i*0.09;
+    gain.gain.setValueAtTime(0, start);
+    gain.gain.linearRampToValueAtTime(0.18, start+0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start+0.5);
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.start(start); osc.stop(start+0.55);
+  });
+}
+function playTick(){
+  if(!state.soundOn) return;
+  const ctx = ensureAudio(); if(!ctx) return;
+  const osc = ctx.createOscillator(); const gain = ctx.createGain();
+  osc.type='square'; osc.frequency.value=340;
+  const now = ctx.currentTime;
+  gain.gain.setValueAtTime(0.05, now);
+  gain.gain.exponentialRampToValueAtTime(0.0001, now+0.045);
+  osc.connect(gain); gain.connect(ctx.destination);
+  osc.start(now); osc.stop(now+0.05);
+}
+function updateSoundIcon(){
+  el('soundIconOn').style.display = state.soundOn ? 'block':'none';
+  el('soundIconOff').style.display = state.soundOn ? 'none':'block';
+  el('soundBtn').setAttribute('aria-pressed', state.soundOn ? 'true':'false');
+}
+
+/* ============================================================
+   6b. THEME (light / dark)
+   ============================================================ */
+function applyTheme(){
+  document.documentElement.setAttribute('data-theme', state.theme);
+  const isLight = state.theme === 'light';
+  el('themeIconDark').style.display = isLight ? 'none' : 'block';
+  el('themeIconLight').style.display = isLight ? 'block' : 'none';
+  el('themeBtn').setAttribute('aria-pressed', isLight ? 'true' : 'false');
+  el('themeBtn').title = isLight ? 'Switch to dark theme' : 'Switch to light theme';
+}
+function toggleTheme(){
+  state.theme = state.theme === 'light' ? 'dark' : 'light';
+  storage.set('dp_theme', state.theme);
+  applyTheme();
+}
+el('themeBtn').addEventListener('click', toggleTheme);
+
+/* ============================================================
+   7. CONFETTI (canvas, respects reduced motion)
+   ============================================================ */
+const canvas = el('confettiCanvas');
+const ctx2d = canvas.getContext('2d');
+let confettiParticles = [];
+let confettiRAF = null;
+const REDUCE_MOTION = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+function resizeCanvas(){ canvas.width = window.innerWidth; canvas.height = window.innerHeight; }
+window.addEventListener('resize', resizeCanvas); resizeCanvas();
+
+function burstConfetti(){
+  if(REDUCE_MOTION) return;
+  const colors = state.theme==='light'
+    ? ['#E2960F','#E1552F','#0E9C77','#C97A00','#201A3D']
+    : ['#F4B740','#FF6B4A','#37E0B0','#FFDD8A','#F6F3EA'];
+  const count = 140;
+  const cx = canvas.width/2;
+  for(let i=0;i<count;i++){
+    confettiParticles.push({
+      x: cx + (Math.random()-0.5)*260,
+      y: canvas.height*0.32 + (Math.random()-0.5)*40,
+      vx: (Math.random()-0.5)*9,
+      vy: -Math.random()*9 - 4,
+      g: 0.22 + Math.random()*0.08,
+      size: 5 + Math.random()*6,
+      color: colors[(Math.random()*colors.length)|0],
+      rot: Math.random()*Math.PI*2,
+      vr: (Math.random()-0.5)*0.3,
+      shape: Math.random()<0.5 ? 'rect':'circle',
+      life: 0, maxLife: 130 + Math.random()*50
+    });
+  }
+  if(!confettiRAF) tickConfetti();
+}
+function tickConfetti(){
+  ctx2d.clearRect(0,0,canvas.width,canvas.height);
+  confettiParticles.forEach(p=>{
+    p.vy += p.g; p.x += p.vx; p.y += p.vy; p.rot += p.vr; p.life++;
+    const alpha = Math.max(0, 1 - p.life/p.maxLife);
+    ctx2d.save();
+    ctx2d.globalAlpha = alpha;
+    ctx2d.translate(p.x, p.y);
+    ctx2d.rotate(p.rot);
+    ctx2d.fillStyle = p.color;
+    if(p.shape==='rect') ctx2d.fillRect(-p.size/2,-p.size/3,p.size,p.size*0.66);
+    else { ctx2d.beginPath(); ctx2d.arc(0,0,p.size/2,0,Math.PI*2); ctx2d.fill(); }
+    ctx2d.restore();
+  });
+  confettiParticles = confettiParticles.filter(p=>p.life<p.maxLife && p.y < canvas.height+40);
+  if(confettiParticles.length){ confettiRAF = requestAnimationFrame(tickConfetti); }
+  else { ctx2d.clearRect(0,0,canvas.width,canvas.height); confettiRAF=null; }
+}
+
+/* ============================================================
+   8. DRAW ENGINE
+   ============================================================ */
+const drawBtn = el('drawBtn');
+const liveDot = el('liveDot');
+const boardStatusLabel = el('boardStatusLabel');
+const SHUFFLE_TICK_MS = 90;
+
+function secureShuffle(arr){
+  const a = arr.slice();
+  for(let i=a.length-1;i>0;i--){
+    let j;
+    if(window.crypto && window.crypto.getRandomValues){
+      const buf = new Uint32Array(1); window.crypto.getRandomValues(buf);
+      j = buf[0] % (i+1);
+    } else {
+      j = Math.floor(Math.random()*(i+1));
+    }
+    [a[i],a[j]] = [a[j],a[i]];
+  }
+  return a;
+}
+
+function startDraw(){
+  if(state.drawing) return;
+  const p = pool();
+  if(state.participants.length===0){ toast(t('toastNoParticipants'), true); return; }
+  if(p.length===0){ toast(t('toastPoolEmpty'), true); return; }
+
+  state.drawing = true;
+  showBoard();
+  drawBtn.textContent = t('btnStop');
+  drawBtn.classList.add('stopping');
+  liveDot.classList.add('live');
+  boardStatusLabel.textContent = t('boardShuffling');
+  el('participantCountLabel').textContent = `${p.length} ${lang==='id' ? 'peserta' : 'in the draw'}`;
+  el('undoBtn').disabled = true;
+
+  const flickerCount = ROWS_PER_COL*2;
+  state.shuffleTimer = setInterval(()=>{
+    const sample = [];
+    const src = p.length ? p : [{name:'—'}];
+    for(let i=0;i<flickerCount;i++){
+      sample.push(src[(Math.random()*src.length)|0]);
+    }
+    const left = sample.slice(0,ROWS_PER_COL), right = sample.slice(ROWS_PER_COL);
+    boardLeft.innerHTML = left.map(x=>rowHtml(x,{spin:true})).join('');
+    boardRight.innerHTML = right.map(x=>rowHtml(x,{spin:true})).join('');
+    playTick();
+  }, SHUFFLE_TICK_MS);
+
+  if(state.stopMode === 'auto'){
+    const ms = Math.max(3, Math.min(30, Number(state.autoStopSeconds)||8)) * 1000;
+    state.autoStopTimer = setTimeout(()=>{ if(state.drawing) stopDraw(); }, ms);
+  }
+}
+
+function stopDraw(){
+  if(!state.drawing) return;
+  clearInterval(state.shuffleTimer); state.shuffleTimer=null;
+  clearTimeout(state.autoStopTimer); state.autoStopTimer=null;
+  state.drawing = false;
+  drawBtn.textContent = t('btnDraw');
+  drawBtn.classList.remove('stopping');
+  liveDot.classList.remove('live');
+  boardStatusLabel.textContent = t('boardIdle');
+
+  const p = pool();
+  const n = Math.min(state.winnersPerRound, p.length);
+  const shuffled = secureShuffle(p);
+  const roundWinners = shuffled.slice(0, n);
+  const roundNum = (state.winners.length ? Math.max(...state.winners.map(w=>w.round)) : 0) + 1;
+  const prizeName = (state.currentPrizeName||'').trim();
+  const stamped = roundWinners.map(w=>({...w, round: roundNum, prizeName, ts: Date.now()}));
+  state.winners = state.winners.concat(stamped);
+  state.lastRoundWinnerIds = stamped.map(w=>w.pid);
+  persistCore();
+
+  renderBoard(); renderStats(); renderControls(); renderHistory();
+  showWinnerOverlay(stamped);
+}
+
+function toggleDraw(){ state.drawing ? stopDraw() : startDraw(); }
+
+function undoLastDraw(){
+  if(!state.lastRoundWinnerIds){ toast(t('toastNothingToUndo'), true); return; }
+  const ids = new Set(state.lastRoundWinnerIds);
+  state.winners = state.winners.filter(w=>!ids.has(w.pid));
+  state.lastRoundWinnerIds = null;
+  persistCore();
+  renderAll();
+  toast(t('toastUndone'));
+}
+
+/* ============================================================
+   9. WINNER OVERLAY
+   ============================================================ */
+const overlay = el('winnerOverlay');
+const revealCardEl = document.querySelector('.reveal-card');
+const revealNamesEl = el('revealNames');
+function showWinnerOverlay(winners){
+  const prizeName = (winners[0] && winners[0].prizeName) || '';
+  const subEl = el('revealSubheading');
+  if(prizeName){
+    el('revealHeading').textContent = prizeName;
+    subEl.textContent = winners.length>1 ? t('winnerPlural') : t('winnerSingular');
+    subEl.style.display = 'block';
+  } else {
+    el('revealHeading').textContent = winners.length>1 ? t('winnerPlural') : t('winnerSingular');
+    subEl.style.display = 'none';
+  }
+  revealNamesEl.innerHTML = winners.map(w=>`
+    <div class="reveal-name-card">
+      ${w.id ? `<div class="reveal-id">${escapeHtml(w.id)}</div>` : ''}
+      <div class="reveal-name">${escapeHtml(w.name)}</div>
+      ${w.cat ? `<div class="reveal-cat">${escapeHtml(w.cat)}</div>` : ''}
+    </div>`).join('');
+
+  // Pick a density tier so any number of simultaneous winners is shown
+  // fully on screen at once, without needing to scroll.
+  const n = winners.length;
+  revealNamesEl.classList.remove('tier-sm','tier-md','tier-lg');
+  revealCardEl.classList.remove('wide','xwide');
+  if(n>=10){ revealNamesEl.classList.add('tier-lg'); revealCardEl.classList.add('xwide'); }
+  else if(n>=5){ revealNamesEl.classList.add('tier-md'); revealCardEl.classList.add('wide'); }
+  else if(n>=2){ revealNamesEl.classList.add('tier-sm'); revealCardEl.classList.add('wide'); }
+
+  overlay.classList.add('open');
+  burstConfetti();
+  playChime();
+  setTimeout(()=>burstConfetti(), 450);
+}
+function closeOverlay(){
+  overlay.classList.remove('open');
+  hideBoard();
+  renderBoard();
+}
+el('continueBtn').addEventListener('click', closeOverlay);
+overlay.addEventListener('click', (e)=>{ if(e.target===overlay || e.target.classList.contains('overlay-bg')) closeOverlay(); });
+
+/* ============================================================
+   10. DRAWER / TABS / SCRIM
+   ============================================================ */
+const drawer = el('drawer'), scrim = el('scrim');
+function openDrawer(tab){
+  drawer.classList.add('open'); scrim.classList.add('open');
+  if(tab) setTab(tab);
+}
+function closeDrawer(){ drawer.classList.remove('open'); scrim.classList.remove('open'); }
+el('settingsBtn').addEventListener('click', ()=>openDrawer());
+el('drawerCloseBtn').addEventListener('click', closeDrawer);
+scrim.addEventListener('click', closeDrawer);
+el('emptyImportBtn').addEventListener('click', ()=>openDrawer('data'));
+
+function setTab(tab){
+  document.querySelectorAll('.drawer-tab').forEach(b=>b.classList.toggle('active', b.dataset.tab===tab));
+  document.querySelectorAll('.drawer-panel').forEach(p=>p.classList.toggle('active', p.dataset.panel===tab));
+  if(tab==='checkin') renderCheckinTab();
+}
+document.querySelectorAll('.drawer-tab').forEach(b=>b.addEventListener('click', ()=>setTab(b.dataset.tab)));
+
+/* ============================================================
+   11. EVENT WIRING — TALLY
+   ============================================================ */
+el('tallyMinus').addEventListener('click', ()=>{
+  if(state.winnersPerRound>1){ state.winnersPerRound--; storage.set('dp_wpr', state.winnersPerRound); renderControls(); }
+});
+el('tallyPlus').addEventListener('click', ()=>{
+  state.winnersPerRound = Math.min(20, state.winnersPerRound+1);
+  storage.set('dp_wpr', state.winnersPerRound); renderControls();
+});
+function clampWinnersPerRound(v){
+  v = Math.round(Number(v));
+  if(!isFinite(v)) v = 1;
+  return Math.max(1, Math.min(20, v));
+}
+el('tallyCount').addEventListener('input', (e)=>{
+  e.target.value = e.target.value.replace(/[^0-9]/g,'').slice(0,2);
+});
+el('tallyCount').addEventListener('blur', (e)=>{
+  const v = clampWinnersPerRound(e.target.value);
+  state.winnersPerRound = v;
+  storage.set('dp_wpr', v);
+  renderControls();
+});
+el('tallyCount').addEventListener('keydown', (e)=>{
+  if(e.key==='Enter'){ e.preventDefault(); e.target.blur(); }
+});
+el('tallyCount').addEventListener('focus', (e)=>{ e.target.select(); });
+el('prizeNameInput').addEventListener('input', (e)=>{
+  state.currentPrizeName = e.target.value;
+  storage.set('dp_prizeName', state.currentPrizeName);
+});
+
+/* ============================================================
+   12. EVENT WIRING — DRAW / UNDO / HISTORY / PAGE
+   ============================================================ */
+drawBtn.addEventListener('click', toggleDraw);
+el('undoBtn').addEventListener('click', undoLastDraw);
+el('historyBtn').addEventListener('click', ()=>openDrawer('history'));
+window.addEventListener('keydown', (e)=>{
+  if(e.code==='Space' && !overlay.classList.contains('open') && document.activeElement.tagName!=='TEXTAREA' && document.activeElement.tagName!=='INPUT' && !document.activeElement.isContentEditable){
+    e.preventDefault(); toggleDraw();
+  }
+  if(e.code==='Escape'){
+    if(overlay.classList.contains('open')) closeOverlay();
+    else if(drawer.classList.contains('open')) closeDrawer();
+  }
+});
+
+/* ============================================================
+   13. EVENT WIRING — DATA IMPORT
+   ============================================================ */
+el('uploadZone').addEventListener('click', ()=>el('fileInput').click());
+el('fileInput').addEventListener('change', handleFileUpload);
+el('uploadZone').addEventListener('dragover', e=>{ e.preventDefault(); el('uploadZone').style.borderColor='var(--gold)'; });
+el('uploadZone').addEventListener('dragleave', ()=>{ el('uploadZone').style.borderColor=''; });
+el('uploadZone').addEventListener('drop', e=>{
+  e.preventDefault(); el('uploadZone').style.borderColor='';
+  if(e.dataTransfer.files.length) processFile(e.dataTransfer.files[0]);
+});
+function handleFileUpload(e){ if(e.target.files.length) processFile(e.target.files[0]); e.target.value=''; }
+
+let xlsxLoadPromise = null;
+function loadXlsxLib(){
+  if(window.XLSX) return Promise.resolve();
+  if(xlsxLoadPromise) return xlsxLoadPromise;
+  toast(t('toastXlsxLoading'));
+  xlsxLoadPromise = new Promise((resolve, reject)=>{
+    const s = document.createElement('script');
+    s.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+    s.onload = resolve; s.onerror = reject;
+    document.head.appendChild(s);
+  });
+  return xlsxLoadPromise;
+}
+
+const TEMPLATE_ROWS = [
+  ['ID','Name','Category','Email'],
+  ['D1001','Jordan Lee','Guest','jordan@example.com'],
+  ['D1002','Amelia Putri','Staff',''],
+  ['D1003','Bagus Santoso','',''],
+];
+function downloadCsvTemplateFallback(){
+  const csv = TEMPLATE_ROWS.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = 'participants_template.csv';
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+el('downloadTemplateBtn').addEventListener('click', ()=>{
+  loadXlsxLib().then(()=>{
+    try{
+      const ws = window.XLSX.utils.aoa_to_sheet(TEMPLATE_ROWS);
+      ws['!cols'] = [{wch:10},{wch:28},{wch:16},{wch:26}];
+      const wb = window.XLSX.utils.book_new();
+      window.XLSX.utils.book_append_sheet(wb, ws, 'Participants');
+      window.XLSX.writeFile(wb, 'participants_template.xlsx');
+      toast(t('toastTemplateDownloaded'));
+    }catch(err){
+      downloadCsvTemplateFallback();
+      toast(t('toastTemplateFail'), true);
+    }
+  }).catch(()=>{
+    downloadCsvTemplateFallback();
+    toast(t('toastTemplateFail'), true);
+  });
+});
+
+function processFile(file){
+  const name = file.name.toLowerCase();
+  if(name.endsWith('.xlsx') || name.endsWith('.xls')){
+    loadXlsxLib().then(()=>{
+      const reader = new FileReader();
+      reader.onload = (ev)=>{
+        try{
+          const wb = window.XLSX.read(ev.target.result, {type:'array'});
+          const sheet = wb.Sheets[wb.SheetNames[0]];
+          const csv = window.XLSX.utils.sheet_to_csv(sheet);
+          const list = parseCsvText(csv);
+          if(!list.length){ toast(t('toastNoFile'), true); return; }
+          setParticipants(list, true);
+        }catch(err){ toast(t('toastNoFile'), true); }
+      };
+      reader.onerror = ()=>toast(t('toastNoFile'), true);
+      reader.readAsArrayBuffer(file);
+    }).catch(()=>toast(t('toastXlsxFail'), true));
+    return;
+  }
+  const reader = new FileReader();
+  reader.onload = (ev)=>{
+    const text = String(ev.target.result||'');
+    const list = name.endsWith('.csv') ? parseCsvText(text) : parseBulkText(text);
+    if(!list.length){ toast(t('toastNoFile'), true); return; }
+    setParticipants(list, true);
+  };
+  reader.onerror = ()=>toast(t('toastNoFile'), true);
+  reader.readAsText(file);
+}
+
+el('applyPasteBtn').addEventListener('click', ()=>{
+  const text = el('pasteArea').value;
+  const list = parseBulkText(text);
+  if(!list.length){ toast(t('toastEmptyPaste'), true); return; }
+  setParticipants(list, true);
+  el('pasteArea').value='';
+});
+
+el('loadSampleBtn').addEventListener('click', loadSample);
+el('emptySampleBtn').addEventListener('click', loadSample);
+function loadSample(){
+  const list = SAMPLE_NAMES.map((row,i)=>({ pid: makePid(), id:'S'+String(i+1).padStart(4,'0'), name:row[0], cat:row[1] }));
+  setParticipants(list, true);
+}
+
+el('clearDataBtn').addEventListener('click', ()=>{
+  if(!state.participants.length) return;
+  if(confirm(t('confirmClearData'))){
+    state.participants = []; state.winners = []; state.lastRoundWinnerIds=null;
+    persistCore(); renderAll();
+    syncParticipantsToMain();
+    refreshCheckinStatus();
+    toast(t('toastCleared'));
+  }
+});
+
+/* ============================================================
+   14. EVENT WIRING — BRANDING
+   ============================================================ */
+el('eventTitle').addEventListener('blur', ()=>{
+  state.eventTitle = el('eventTitle').textContent.trim() || (lang==='id'?'Undian Doorprize':'Lucky Draw');
+  storage.set('dp_title', state.eventTitle);
+  renderBranding();
+});
+el('eventTitle').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); el('eventTitle').blur(); } });
+el('eventOrg').addEventListener('blur', ()=>{
+  state.eventOrg = el('eventOrg').textContent.trim();
+  storage.set('dp_org', state.eventOrg);
+});
+el('eventOrg').addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); el('eventOrg').blur(); } });
+
+el('titleInput').addEventListener('input', ()=>{
+  state.eventTitle = el('titleInput').value; storage.set('dp_title', state.eventTitle); renderBranding();
+});
+el('orgInput').addEventListener('input', ()=>{
+  state.eventOrg = el('orgInput').value; storage.set('dp_org', state.eventOrg); el('eventOrg').textContent = state.eventOrg;
+});
+
+el('logoUploadBtn').addEventListener('click', ()=>el('logoInput').click());
+el('logoInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  compressImageFile(file, 400, 0.88).then(dataUrl=>{
+    state.logoDataUrl = dataUrl; storage.set('dp_logo', dataUrl); renderBranding();
+  }).catch(()=>toast(t('toastBgFail'), true));
+  e.target.value='';
+});
+el('logoRemoveBtn').addEventListener('click', ()=>{ state.logoDataUrl=null; storage.set('dp_logo', null); renderBranding(); });
+
+el('bgUploadBtn').addEventListener('click', ()=>el('bgInput').click());
+el('bgInput').addEventListener('change', (e)=>{
+  const file = e.target.files[0]; if(!file) return;
+  toast(t('toastBgProcessing'));
+  compressImageFile(file, 1920, 0.82).then(dataUrl=>{
+    state.bgImageDataUrl = dataUrl;
+    try{
+      storage.set('dp_bg', dataUrl);
+    }catch(err){ /* best-effort; still apply for this session even if it can't persist */ }
+    renderBranding();
+    toast(t('toastBgApplied'));
+  }).catch(()=>toast(t('toastBgFail'), true));
+  e.target.value='';
+});
+el('bgRemoveBtn').addEventListener('click', ()=>{
+  state.bgImageDataUrl=null; storage.set('dp_bg', null); renderBranding();
+  toast(t('toastBgRemoved'));
+});
+
+/* ============================================================
+   15. EVENT WIRING — OPTIONS
+   ============================================================ */
+el('excludeToggle').addEventListener('change', (e)=>{
+  state.excludePrevious = e.target.checked; storage.set('dp_exclude', state.excludePrevious);
+  renderBoard(); renderStats(); renderControls();
+});
+el('soundToggle').addEventListener('change', (e)=>{
+  state.soundOn = e.target.checked; storage.set('dp_sound', state.soundOn); updateSoundIcon();
+  if(state.soundOn) ensureAudio();
+});
+document.querySelectorAll('.segmented-btn[data-stop-mode]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    state.stopMode = btn.dataset.stopMode;
+    storage.set('dp_stop_mode', state.stopMode);
+    renderControls();
+  });
+});
+el('autoStopSeconds').addEventListener('input', (e)=>{
+  let v = Math.round(Number(e.target.value));
+  if(!isFinite(v)) v = 8;
+  v = Math.max(3, Math.min(30, v));
+  state.autoStopSeconds = v;
+  storage.set('dp_autostop_secs', v);
+});
+el('autoStopSeconds').addEventListener('blur', ()=>{ renderControls(); });
+el('soundBtn').addEventListener('click', ()=>{
+  state.soundOn = !state.soundOn; storage.set('dp_sound', state.soundOn);
+  el('soundToggle').checked = state.soundOn; updateSoundIcon();
+  if(state.soundOn){ ensureAudio(); playTick(); }
+});
+
+el('resetAllBtn').addEventListener('click', ()=>{
+  if(confirm(t('confirmReset'))){
+    state.participants=[]; state.winners=[]; state.lastRoundWinnerIds=null;
+    state.winnersPerRound=1; state.excludePrevious=true; state.page=0;
+    state.currentPrizeName='';
+    state.checkinFields=[]; state.checkinAllowedDomains=[]; state.checkinOpen=true;
+    persistCore(); storage.set('dp_exclude', true); storage.set('dp_wpr',1); storage.set('dp_prizeName','');
+    storage.set('dp_checkin_fields', []); storage.set('dp_checkin_domains', []); storage.set('dp_checkin_open', true);
+    renderAll();
+    syncParticipantsToMain();
+    syncFieldsToMain();
+    syncAllowedDomainsToMain();
+    checkinApi.setOpen(true);
+    refreshCheckinStatus();
+    toast(t('toastReset'));
+    closeDrawer();
+  }
+});
+
+/* ============================================================
+   16. EXPORT CSV
+   ============================================================ */
+function extraKeys(list){
+  const keys = [];
+  list.forEach(p=>Object.keys(p.extra||{}).forEach(k=>{ if(!keys.includes(k)) keys.push(k); }));
+  return keys;
+}
+function downloadCsv(rows, filename){
+  // leading = + - @ can be interpreted as a formula by Excel; neutralise with a quote
+  const safe = (v)=>{ const s=String(v==null?'':v); return /^[=+\-@]/.test(s) ? "'"+s : s; };
+  const csv = rows.map(r=>r.map(v=>`"${safe(v).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob(['\ufeff'+csv], {type:'text/csv;charset=utf-8;'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 2000);
+}
+el('exportCsvBtn').addEventListener('click', ()=>{
+  if(!state.winners.length){ toast(t('historyEmpty'), true); return; }
+  const xk = extraKeys(state.winners);
+  const rows = [['Round','Prize','ID','Name','Email','Category',...xk,'Timestamp']];
+  state.winners.forEach(w=>{
+    const prizeLabel = (w.prizeName||'').trim() || `${t('round')} ${w.round}`;
+    rows.push([w.round, prizeLabel, w.id||'', w.name, w.email||'', w.cat||'', ...xk.map(k=>(w.extra||{})[k]||''), new Date(w.ts).toISOString()]);
+  });
+  downloadCsv(rows, `winners_${new Date().toISOString().slice(0,10)}.csv`);
+  toast(t('toastExported'));
+});
+el('exportParticipantsBtn').addEventListener('click', ()=>{
+  if(!state.participants.length){ toast(t('noParticipantsMsg'), true); return; }
+  const wonIds = new Set(state.winners.map(w=>w.pid));
+  const xk = extraKeys(state.participants);
+  const rows = [['ID','Name','Email','Category',...xk,'Source','Won']];
+  state.participants.forEach(p=>{
+    rows.push([p.id||'', p.name, p.email||'', p.cat||'', ...xk.map(k=>(p.extra||{})[k]||''), p.source==='qr'?'QR':'Import', wonIds.has(p.pid)?'Yes':'']);
+  });
+  downloadCsv(rows, `participants_${new Date().toISOString().slice(0,10)}.csv`);
+  toast(t('toastParticipantsExported'));
+});
+
+/* ============================================================
+   17. LANGUAGE TOGGLE
+   ============================================================ */
+document.querySelectorAll('[data-lang-btn]').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const newLang = btn.dataset.langBtn;
+    if(newLang===lang) return;
+    lang = newLang; storage.set('dp_lang', lang);
+    // if title is still at a known default, translate the default too
+    if(state.eventTitle==='Lucky Draw' || state.eventTitle==='Undian Doorprize'){
+      state.eventTitle = lang==='id' ? 'Undian Doorprize' : 'Lucky Draw';
+      storage.set('dp_title', state.eventTitle);
+    }
+    renderAll();
+  });
+});
+
+/* ============================================================
+   18. FULLSCREEN
+   ============================================================ */
+el('fullscreenBtn').addEventListener('click', ()=>{
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen?.().catch(()=>{});
+  } else {
+    document.exitFullscreen?.().catch(()=>{});
+  }
+});
+
+/* While fullscreen, the top-right menus (stats, language, theme, sound, fullscreen, settings)
+   fade out so the projector shows only the stage. Esc leaves fullscreen and brings them back.
+   The display-mode query is a best-effort extra for browsers that report F11 fullscreen that way. */
+const fsQuery = window.matchMedia ? window.matchMedia('(display-mode: fullscreen)') : null;
+function syncFullscreenState(){
+  const on = !!(document.fullscreenElement || document.webkitFullscreenElement) || !!(fsQuery && fsQuery.matches);
+  document.documentElement.classList.toggle('is-fullscreen', on);
+}
+document.addEventListener('fullscreenchange', syncFullscreenState);
+document.addEventListener('webkitfullscreenchange', syncFullscreenState);
+if(fsQuery){
+  if(fsQuery.addEventListener) fsQuery.addEventListener('change', syncFullscreenState);
+  else if(fsQuery.addListener) fsQuery.addListener(syncFullscreenState);
+}
+syncFullscreenState();
+
+/* ============================================================
+   18b. QR CHECK-IN
+   One tab, two transports:
+   - Desktop app: window.checkinAPI (a local server reached over the same Wi-Fi).
+   - Standalone HTML (this file): a browser-to-browser link through PeerJS.
+     Phones open this same file from a public address (?checkin=<id>) and
+     send their details straight to this page.
+   ============================================================ */
+/* Minimal QR Code encoder (byte mode, versions 1-10, ECC L/M/Q/H).
+   Self-contained so the standalone file needs no external QR library. */
+const QR = (function(){
+  // ---- Galois field GF(256), primitive polynomial 0x11D ----
+  const EXP = new Array(256), LOG = new Array(256);
+  (function(){ let x = 1; for(let i=0;i<255;i++){ EXP[i]=x; LOG[x]=i; x<<=1; if(x&256) x^=0x11D; } EXP[255]=EXP[0]; })();
+  function gmul(a,b){ return (a===0||b===0) ? 0 : EXP[(LOG[a]+LOG[b])%255]; }
+
+  function rsGenerator(n){
+    let poly = [1];
+    for(let i=0;i<n;i++){
+      const next = new Array(poly.length+1).fill(0);
+      for(let j=0;j<poly.length;j++){
+        next[j]   ^= poly[j];
+        next[j+1] ^= gmul(poly[j], EXP[i]);
+      }
+      poly = next;
+    }
+    return poly;
+  }
+  const genCache = {};
+  function rsRemainder(data, ecLen){
+    const gen = genCache[ecLen] || (genCache[ecLen] = rsGenerator(ecLen));
+    const res = new Array(ecLen).fill(0);
+    for(let k=0;k<data.length;k++){
+      const factor = data[k] ^ res.shift();
+      res.push(0);
+      if(factor!==0) for(let i=0;i<ecLen;i++) res[i] ^= gmul(gen[i+1], factor);
+    }
+    return res;
+  }
+
+  // ---- Tables: [ecCodewordsPerBlock, [blockCount, dataCodewordsPerBlock], ...] per version (index = version) ----
+  const BLOCKS = {
+    L:[null,[7,[1,19]],[10,[1,34]],[15,[1,55]],[20,[1,80]],[26,[1,108]],[18,[2,68]],[20,[2,78]],[24,[2,97]],[30,[2,116]],[18,[2,68],[2,69]]],
+    M:[null,[10,[1,16]],[16,[1,28]],[26,[1,44]],[18,[2,32]],[24,[2,43]],[16,[4,27]],[18,[4,31]],[22,[2,38],[2,39]],[22,[3,36],[2,37]],[26,[4,43],[1,44]]],
+    Q:[null,[13,[1,13]],[22,[1,22]],[18,[2,17]],[26,[2,24]],[18,[2,15],[2,16]],[24,[4,19]],[18,[2,14],[4,15]],[22,[4,18],[2,19]],[20,[4,16],[4,17]],[24,[6,19],[2,20]]],
+    H:[null,[17,[1,9]],[28,[1,16]],[22,[2,13]],[16,[4,9]],[22,[2,11],[2,12]],[28,[4,15]],[26,[4,13],[1,14]],[26,[4,14],[2,15]],[24,[4,12],[4,13]],[28,[6,15],[2,16]]]
+  };
+  const FMT = { L:1, M:0, Q:3, H:2 };
+  const ALIGN = [null,[],[6,18],[6,22],[6,26],[6,30],[6,34],[6,22,38],[6,24,42],[6,26,46],[6,28,50]];
+  const MAX_VERSION = 10;
+
+  function bchDigit(d){ let n = 0; while(d!==0){ n++; d >>>= 1; } return n; }
+  function bchFormat(data){
+    let d = data << 10;
+    while(bchDigit(d) - bchDigit(0x537) >= 0) d ^= (0x537 << (bchDigit(d) - bchDigit(0x537)));
+    return ((data << 10) | d) ^ 0x5412;
+  }
+  function bchVersion(data){
+    let d = data << 12;
+    while(bchDigit(d) - bchDigit(0x1F25) >= 0) d ^= (0x1F25 << (bchDigit(d) - bchDigit(0x1F25)));
+    return (data << 12) | d;
+  }
+
+  function maskBit(mask, r, c){
+    switch(mask){
+      case 0: return (r + c) % 2 === 0;
+      case 1: return r % 2 === 0;
+      case 2: return c % 3 === 0;
+      case 3: return (r + c) % 3 === 0;
+      case 4: return (Math.floor(r/2) + Math.floor(c/3)) % 2 === 0;
+      case 5: return (r*c) % 2 + (r*c) % 3 === 0;
+      case 6: return ((r*c) % 2 + (r*c) % 3) % 2 === 0;
+      default: return ((r*c) % 3 + (r+c) % 2) % 2 === 0;
+    }
+  }
+
+  function buildMatrix(ver, ecl, mask, codewords){
+    const size = ver*4 + 17;
+    const m = Array.from({length:size}, ()=>new Array(size).fill(null));
+
+    const finder = (r0,c0)=>{
+      for(let dr=-1;dr<=7;dr++) for(let dc=-1;dc<=7;dc++){
+        const r=r0+dr, c=c0+dc;
+        if(r<0||r>=size||c<0||c>=size) continue;
+        const inside = dr>=0&&dr<=6&&dc>=0&&dc<=6;
+        m[r][c] = inside && (dr===0||dr===6||dc===0||dc===6 || (dr>=2&&dr<=4&&dc>=2&&dc<=4));
+      }
+    };
+    finder(0,0); finder(0,size-7); finder(size-7,0);
+
+    const pos = ALIGN[ver];
+    for(let a=0;a<pos.length;a++) for(let b=0;b<pos.length;b++){
+      const r=pos[a], c=pos[b];
+      if(m[r][c]!==null) continue; // overlaps a finder pattern
+      for(let dr=-2;dr<=2;dr++) for(let dc=-2;dc<=2;dc++) m[r+dr][c+dc] = Math.max(Math.abs(dr),Math.abs(dc)) !== 1;
+    }
+
+    for(let i=8;i<size-8;i++){
+      if(m[6][i]===null) m[6][i] = (i%2===0);
+      if(m[i][6]===null) m[i][6] = (i%2===0);
+    }
+
+    // format information (error level + mask)
+    const fbits = bchFormat((FMT[ecl] << 3) | mask);
+    for(let i=0;i<15;i++){
+      const bit = ((fbits >> i) & 1) === 1;
+      if(i < 6) m[i][8] = bit; else if(i < 8) m[i+1][8] = bit; else m[size-15+i][8] = bit;
+      if(i < 8) m[8][size-i-1] = bit; else if(i < 9) m[8][15-i-1+1] = bit; else m[8][15-i-1] = bit;
+    }
+    m[size-8][8] = true; // always-dark module
+
+    if(ver >= 7){
+      const vbits = bchVersion(ver);
+      for(let i=0;i<18;i++){
+        const bit = ((vbits >> i) & 1) === 1;
+        m[Math.floor(i/3)][i%3 + size - 8 - 3] = bit;
+        m[i%3 + size - 8 - 3][Math.floor(i/3)] = bit;
+      }
+    }
+
+    // place data in the zig-zag order
+    let inc = -1, row = size-1, bitIndex = 7, byteIndex = 0;
+    for(let col=size-1; col>0; col-=2){
+      if(col===6) col--;
+      for(;;){
+        for(let k=0;k<2;k++){
+          if(m[row][col-k]===null){
+            let dark = false;
+            if(byteIndex < codewords.length) dark = ((codewords[byteIndex] >>> bitIndex) & 1) === 1;
+            if(maskBit(mask, row, col-k)) dark = !dark;
+            m[row][col-k] = dark;
+            if(--bitIndex === -1){ byteIndex++; bitIndex = 7; }
+          }
+        }
+        row += inc;
+        if(row < 0 || row >= size){ row -= inc; inc = -inc; break; }
+      }
+    }
+    return m;
+  }
+
+  function penalty(m){
+    const n = m.length;
+    let score = 0, dark = 0;
+    const runs = (get)=>{
+      let s = 0, run = 1;
+      for(let i=1;i<n;i++){
+        if(get(i) === get(i-1)) run++;
+        else { if(run>=5) s += 3 + (run-5); run = 1; }
+      }
+      if(run>=5) s += 3 + (run-5);
+      return s;
+    };
+    const P1 = [1,0,1,1,1,0,1,0,0,0,0], P2 = [0,0,0,0,1,0,1,1,1,0,1];
+    const finderLike = (get)=>{
+      let s = 0;
+      for(let i=0;i+11<=n;i++){
+        let a = true, b = true;
+        for(let k=0;k<11;k++){ const v = get(i+k) ? 1 : 0; if(v!==P1[k]) a = false; if(v!==P2[k]) b = false; if(!a && !b) break; }
+        if(a) s += 40;
+        if(b) s += 40;
+      }
+      return s;
+    };
+    for(let r=0;r<n;r++){
+      score += runs(i=>m[r][i]) + finderLike(i=>m[r][i]);
+      for(let c=0;c<n;c++) if(m[r][c]) dark++;
+    }
+    for(let c=0;c<n;c++) score += runs(i=>m[i][c]) + finderLike(i=>m[i][c]);
+    for(let r=0;r<n-1;r++) for(let c=0;c<n-1;c++){
+      const v = m[r][c];
+      if(v===m[r][c+1] && v===m[r+1][c] && v===m[r+1][c+1]) score += 3;
+    }
+    score += Math.floor(Math.abs(dark*100/(n*n) - 50) / 5) * 10;
+    return score;
+  }
+
+  function utf8(str){
+    if(typeof TextEncoder !== 'undefined') return Array.from(new TextEncoder().encode(str));
+    const s = unescape(encodeURIComponent(str)), out = [];
+    for(let i=0;i<s.length;i++) out.push(s.charCodeAt(i));
+    return out;
+  }
+
+  function encode(text, ecl){
+    const bytes = utf8(String(text));
+    for(let ver=1; ver<=MAX_VERSION; ver++){
+      const info = BLOCKS[ecl][ver], ecPer = info[0], groups = info.slice(1);
+      const dataCw = groups.reduce((s,g)=>s+g[0]*g[1], 0);
+      const ccBits = ver <= 9 ? 8 : 16;
+      if(4 + ccBits + bytes.length*8 > dataCw*8) continue;
+
+      const bits = [];
+      const put = (v,len)=>{ for(let i=len-1;i>=0;i--) bits.push((v>>>i)&1); };
+      put(4,4); put(bytes.length, ccBits); bytes.forEach(b=>put(b,8));
+      put(0, Math.min(4, dataCw*8 - bits.length));
+      while(bits.length % 8) bits.push(0);
+      const data = [];
+      for(let i=0;i<bits.length;i+=8){ let v = 0; for(let j=0;j<8;j++) v = (v<<1) | bits[i+j]; data.push(v); }
+      for(let pad=0xEC; data.length<dataCw; pad^=0xFD) data.push(pad);
+
+      const blocks = []; let at = 0;
+      groups.forEach(g=>{ for(let i=0;i<g[0];i++){ const d = data.slice(at, at+g[1]); at += g[1]; blocks.push({d:d, ec:rsRemainder(d, ecPer)}); } });
+      const out = [], longest = Math.max.apply(null, blocks.map(b=>b.d.length));
+      for(let i=0;i<longest;i++) blocks.forEach(b=>{ if(i<b.d.length) out.push(b.d[i]); });
+      for(let i=0;i<ecPer;i++) blocks.forEach(b=>out.push(b.ec[i]));
+
+      let best = null, bestScore = Infinity;
+      for(let mask=0;mask<8;mask++){
+        const m = buildMatrix(ver, ecl, mask, out);
+        const sc = penalty(m);
+        if(sc < bestScore){ bestScore = sc; best = m; }
+      }
+      return { version: ver, size: ver*4+17, modules: best };
+    }
+    return null;
+  }
+
+  function toSvg(q, quiet){
+    const dim = q.size + quiet*2;
+    let d = '';
+    for(let r=0;r<q.size;r++){
+      let c = 0;
+      while(c < q.size){
+        if(q.modules[r][c]){
+          const s = c;
+          while(c < q.size && q.modules[r][c]) c++;
+          d += 'M'+(s+quiet)+' '+(r+quiet)+'h'+(c-s)+'v1h-'+(c-s)+'z';
+        } else c++;
+      }
+    }
+    return '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+dim+' '+dim+'" shape-rendering="crispEdges">'
+         + '<rect width="'+dim+'" height="'+dim+'" fill="#fff"/><path d="'+d+'" fill="#000"/></svg>';
+  }
+
+  return {
+    /* Returns an <img>-ready data URL (SVG), or null if the text doesn't fit. */
+    svgDataUrl: function(text){
+      const q = encode(text, 'M') || encode(text, 'L');
+      return q ? 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(toSvg(q, 4)) : null;
+    },
+    _encode: encode, _toSvg: toSvg, _BLOCKS: BLOCKS
+  };
+})();
+
+
+function createWebCheckin(env){
+  const LS_PEER = 'dp_checkin_peer', LS_URL = 'dp_checkin_public_url';
+  /* Public address of this page on GitHub Pages (repo: jwccampus-eng/senayancampus).
+     Phones open this address when they scan the QR. It is used when this page is opened
+     from a file on the computer, so the QR works even without pasting a link first.
+     If the page is already opened from its public address, that address is used instead. */
+  const DEFAULT_PUBLIC_URL = 'https://jwccampus-eng.github.io/senayancampus/';
+  const S = {
+    peer:null, phase:'idle', error:'', tries:0, retryTimer:null,
+    open:true, fields:[], domains:[], brand:{ title:'', lang:'en', logo:null },
+    onNew:null, conns:new Set()
+  };
+  const self = { onChange:null };
+
+  function randomId(n){
+    const abc = 'abcdefghijklmnopqrstuvwxyz0123456789';
+    const buf = (window.crypto && window.crypto.getRandomValues) ? window.crypto.getRandomValues(new Uint8Array(n)) : null;
+    let s = '';
+    for(let i=0;i<n;i++) s += abc[(buf ? buf[i] : Math.floor(Math.random()*256)) % 36];
+    return s;
+  }
+  // The id is what the QR points at, so keep it stable across page reloads.
+  let peerId = storage.get(LS_PEER, '');
+  if(!/^dpd-[a-z0-9]{12}$/.test(peerId)){ peerId = 'dpd-' + randomId(12); storage.set(LS_PEER, peerId); }
+
+  function setPhase(phase, error){
+    S.phase = phase; S.error = error || '';
+    if(self.onChange) self.onChange();
+  }
+
+  /* ---- address phones should open ---- */
+  function hostedUrl(){
+    try{
+      if(!/^https?:$/.test(location.protocol)) return '';
+      if(/^(localhost$|127\.|0\.0\.0\.0|\[::1\])/.test(location.hostname)) return '';
+      return location.origin + location.pathname;
+    }catch(e){ return ''; }
+  }
+  function normalizeUrl(raw){
+    let s = String(raw || '').trim();
+    if(!s) return '';
+    if(!/^[a-z][a-z0-9+.-]*:\/\//i.test(s)) s = 'https://' + s;
+    try{
+      const u = new URL(s);
+      if(u.protocol !== 'https:' && u.protocol !== 'http:') return '';
+      if(!u.hostname || (u.hostname.indexOf('.') < 0 && u.hostname !== 'localhost')) return '';
+      u.search = ''; u.hash = '';
+      return u.toString();
+    }catch(e){ return ''; }
+  }
+  function savedUrl(){ return normalizeUrl(storage.get(LS_URL, '')); }
+  function baseUrl(){ return savedUrl() || hostedUrl() || normalizeUrl(DEFAULT_PUBLIC_URL); }
+  function linkUrl(){
+    const b = baseUrl();
+    if(!b) return '';
+    const u = new URL(b);
+    u.searchParams.set('checkin', peerId);
+    return u.toString();
+  }
+
+  /* ---- messages to phones ---- */
+  function configMsg(){
+    return {
+      t:'config', open:S.open, title:S.brand.title, lang:S.brand.lang,
+      fields:S.fields.map(f=>({ key:f.key, label:f.label, required:!!f.required })),
+      domains:S.domains
+    };
+  }
+  function pushConfig(){
+    const msg = JSON.stringify(configMsg());
+    S.conns.forEach(c=>{ try{ if(c.open) c.send(msg); }catch(e){} });
+  }
+  function update(fn){
+    const before = JSON.stringify(configMsg());
+    fn();
+    if(JSON.stringify(configMsg()) !== before) pushConfig();
+  }
+
+  function cleanText(v, max){
+    if(typeof v !== 'string') return '';
+    return v.replace(/[\u0000-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, max);
+  }
+
+  /* Phones are untrusted: every rule is re-checked here. */
+  function processCheckin(m){
+    if(!S.open) return { ok:false, code:'closed' };
+    const name = cleanText(m.name, 80);
+    const email = cleanText(m.email, 120);
+    if(!name) return { ok:false, code:'invalid', field:'name' };
+    if(!EMAIL_RE.test(email)) return { ok:false, code:'invalid', field:'email' };
+    if(S.domains.length && !emailDomainAllowed(email, S.domains)) return { ok:false, code:'domain' };
+    const src = (m.extra && typeof m.extra === 'object') ? m.extra : {};
+    const extra = {};
+    for(let i=0;i<S.fields.length;i++){
+      const f = S.fields[i];
+      const v = cleanText(src[f.key], 120);
+      if(f.required && !v) return { ok:false, code:'invalid', field:f.key };
+      if(v) extra[f.key] = v;
+    }
+    if(isDuplicateParticipant({ name:name, email:email }, env.getParticipants())) return { ok:true, status:'already' };
+    if(S.onNew) S.onNew({ name:name, email:email, extra:extra });
+    return { ok:true, status:'new' };
+  }
+
+  function handleConn(c){
+    S.conns.add(c);
+    let used = 0;
+    const send = (obj)=>{ try{ c.send(JSON.stringify(obj)); }catch(e){} };
+    c.on('open', ()=>{
+      send(configMsg());
+      const logo = S.brand.logo;
+      if(typeof logo === 'string' && logo.indexOf('data:image/') === 0 && logo.length <= 300000) send({ t:'logo', data:logo });
+    });
+    c.on('data', (raw)=>{
+      let m;
+      try{ m = typeof raw === 'string' ? JSON.parse(raw) : raw; }catch(e){ return; }
+      if(!m || typeof m !== 'object' || m.t !== 'checkin') return;
+      if(++used > 5) return;
+      send(Object.assign({ t:'result' }, processCheckin(m)));
+      setTimeout(()=>{ try{ c.close(); }catch(e){} }, 5000);
+    });
+    const drop = ()=>{ S.conns.delete(c); };
+    c.on('close', drop);
+    c.on('error', drop);
+  }
+
+  /* ---- connection to the PeerJS broker ---- */
+  function destroyPeer(){
+    const p = S.peer; S.peer = null;
+    if(p){ try{ p.destroy(); }catch(e){} }
+  }
+  function retry(code){
+    S.tries++;
+    if(S.tries > 8) return setPhase('error', code);
+    setPhase('connecting');
+    clearTimeout(S.retryTimer);
+    S.retryTimer = setTimeout(()=>{ if(window.Peer) createPeer(window.Peer); }, Math.min(1500 * S.tries, 8000));
+  }
+  function createPeer(Peer){
+    destroyPeer();
+    let p;
+    try{ p = new Peer(peerId, { debug:0 }); }catch(e){ return setPhase('error', 'unsupported'); }
+    S.peer = p;
+    p.on('open', ()=>{ if(S.peer !== p) return; S.tries = 0; setPhase('ready'); });
+    p.on('connection', (c)=>{ if(S.peer === p) handleConn(c); });
+    p.on('disconnected', ()=>{
+      if(S.peer !== p || p.destroyed) return;
+      setPhase('reconnecting');
+      setTimeout(()=>{ if(S.peer === p && !p.destroyed){ try{ p.reconnect(); }catch(e){} } }, 2000);
+    });
+    p.on('error', (err)=>{
+      if(S.peer !== p) return;
+      const type = err && err.type;
+      if(type === 'unavailable-id') return retry('idbusy');
+      if(type === 'browser-incompatible') return setPhase('error', 'unsupported');
+      if(type === 'peer-unavailable' || type === 'webrtc') return; // problems with one phone, not with the broker
+      retry('server');
+    });
+    p.on('close', ()=>{ if(S.peer === p) retry('server'); }); // destroyed by the library itself
+  }
+  async function start(){
+    if(S.phase !== 'idle' && S.phase !== 'error') return;
+    clearTimeout(S.retryTimer);
+    setPhase('loading');
+    let Peer;
+    try{ Peer = await loadPeerLib(); }catch(e){ return setPhase('error', 'lib'); }
+    if(typeof window.RTCPeerConnection === 'undefined') return setPhase('error', 'unsupported');
+    setPhase('connecting');
+    createPeer(Peer);
+  }
+
+  async function getStatus(){
+    const base = baseUrl();
+    const url = base ? linkUrl() : '';
+    const qr = url ? QR.svgDataUrl(url) : null;
+    return {
+      running:true, url:url, qrDataUrl:qr, open:S.open, count:env.countQr(),
+      web:{ phase:S.phase, error:S.error, needUrl:!base, tooLong:!!url && !qr, canEditUrl:!hostedUrl() || !!savedUrl(), savedUrl:savedUrl() }
+    };
+  }
+
+  self.start = start;
+  self.restart = ()=>{ clearTimeout(S.retryTimer); S.tries = 0; destroyPeer(); S.phase = 'idle'; return start(); };
+  self.phase = ()=>S.phase;
+  self.hasBase = ()=>!!baseUrl();
+  self.setPublicUrl = (raw)=>{
+    const s = String(raw || '').trim();
+    if(!s){ storage.set(LS_URL, ''); return { ok:true }; }
+    const n = normalizeUrl(s);
+    if(!n) return { ok:false };
+    storage.set(LS_URL, n);
+    return { ok:true };
+  };
+  self.api = {
+    syncParticipants(){},
+    setBranding(b){ update(()=>{ S.brand = { title:String((b&&b.title)||''), lang:(b&&b.lang)==='id' ? 'id' : 'en', logo:(b&&b.logo)||null }; }); },
+    setFields(f){ update(()=>{ S.fields = Array.isArray(f) ? f.slice() : []; }); },
+    setAllowedDomains(d){ update(()=>{ S.domains = Array.isArray(d) ? d.slice() : []; }); },
+    setOpen(v){ update(()=>{ S.open = !!v; }); },
+    getStatus:getStatus,
+    onNewCheckin(cb){ S.onNew = cb; }
+  };
+  window.addEventListener('pagehide', ()=>{ try{ if(S.peer) S.peer.destroy(); }catch(e){} });
+  return self;
+}
+
+const nativeCheckin = typeof window.checkinAPI !== 'undefined';
+const webCk = nativeCheckin ? null : createWebCheckin({
+  getParticipants: ()=>state.participants,
+  countQr: ()=>state.participants.filter(p=>p.source==='qr').length
+});
+const checkinApi = nativeCheckin ? window.checkinAPI : webCk.api;
+const hasCheckinAPI = true; // desktop: local server, standalone page: browser-to-browser link
+let checkinStatusCache = null;
+let checkinAutoSaved = false;
+const checkinQrOverlayEl = el('checkinQrOverlay');
+
+function syncParticipantsToMain(){
+  if(webCk) return; // the web transport reads state.participants directly
+  try{ checkinApi.syncParticipants(state.participants.map(p=>({id:p.id, name:p.name, email:p.email||'', source:p.source||''}))); }catch(e){}
+}
+function syncBrandingToMain(){
+  try{ checkinApi.setBranding({ title: state.eventTitle, lang, logo: state.logoDataUrl }); }catch(e){}
+}
+function syncFieldsToMain(){
+  try{ checkinApi.setFields(state.checkinFields); }catch(e){}
+}
+function syncAllowedDomainsToMain(){
+  try{ checkinApi.setAllowedDomains(state.checkinAllowedDomains); }catch(e){}
+}
+function parseAllowedDomains(text){
+  return text.split(',').map(s=>s.trim().toLowerCase()).filter(Boolean).slice(0,15);
+}
+
+function addCheckinParticipant(data){
+  const candidate = { name: data.name, email: data.email };
+  if(isDuplicateParticipant(candidate, state.participants)) return; // safety net; the check-in source already checks this
+  const p = {
+    pid: makePid(), id: '', name: data.name, cat: '',
+    email: data.email || '', extra: data.extra || {}, source: 'qr',
+  };
+  state.participants.push(p);
+  persistCore();
+  renderAll();
+  syncParticipantsToMain();
+  toast(t('toastCheckinNewPerson', data.name));
+}
+
+async function refreshCheckinStatus(){
+  try{
+    checkinStatusCache = await checkinApi.getStatus();
+    applyCheckinStatusToUI();
+  }catch(e){}
+}
+
+function webStatusInfo(web){
+  switch(web.phase){
+    case 'ready':        return { cls:'ready', text:t(web.needUrl ? 'ckReadyNeedUrl' : 'ckReady') };
+    case 'reconnecting': return { cls:'busy',  text:t('ckReconnecting') };
+    case 'loading':      return { cls:'busy',  text:t('ckLoading') };
+    case 'error': {
+      const key = web.error==='idbusy' ? 'ckErrIdBusy' : web.error==='unsupported' ? 'ckErrUnsupported' : web.error==='server' ? 'ckErrServer' : 'ckErrLib';
+      return { cls:'error', text:t(key) };
+    }
+    default:             return { cls:'busy',  text:t('ckConnecting') };
+  }
+}
+
+function applyCheckinStatusToUI(){
+  const s = checkinStatusCache;
+  const img = el('checkinQrImg');
+  if(!img) return;
+  const urlText = el('checkinUrlText');
+  const openToggle = el('checkinOpenToggle');
+  const countLabel = el('checkinCountLabel');
+  const web = s && s.web ? s.web : null;
+
+  // Once the QR is live (link set + connected), reconnect by itself after a page reload
+  // so an accidental refresh during check-in doesn't silently break the QR on screen.
+  if(web && web.phase === 'ready' && !web.needUrl && !checkinAutoSaved){
+    checkinAutoSaved = true;
+    storage.set('dp_checkin_auto', true);
+  }
+
+  el('checkinNetworkHint').textContent = t(web ? 'checkinWebHint' : 'checkinNetworkHint');
+  el('checkinWebSetup').style.display = (web && web.canEditUrl) ? 'flex' : 'none';
+  if(web){
+    const inp = el('checkinPublicUrlInput');
+    if(document.activeElement !== inp) inp.value = web.savedUrl || '';
+  }
+  if(!s || !s.running){ urlText.textContent = ''; countLabel.textContent = ''; return; }
+
+  const hasQr = !!s.qrDataUrl;
+  if(hasQr){ img.src = s.qrDataUrl; el('checkinQrImgBig').src = s.qrDataUrl; }
+  img.style.display = (hasQr || !web) ? 'block' : 'none';
+  const ph = el('checkinQrPlaceholder');
+  const phText = (web && !hasQr) ? t(web.needUrl ? 'checkinNeedUrl' : 'checkinTooLong') : '';
+  ph.textContent = phText;
+  ph.style.display = phText ? 'flex' : 'none';
+
+  urlText.textContent = web ? (s.url || '') : (s.url || t('toastCheckinNoNetwork'));
+  el('checkinCopyBtn').disabled = !s.url;
+  el('checkinFullscreenBtn').disabled = !hasQr;
+  openToggle.checked = !!s.open;
+  countLabel.textContent = t('checkinCountText', s.count||0);
+
+  const st = el('checkinWebStatus');
+  const big = el('checkinStatusBig');
+  if(web){
+    const info = webStatusInfo(web);
+    st.style.display = 'flex';
+    st.className = 'checkin-status ' + info.cls;
+    el('checkinWebStatusText').textContent = info.text;
+    el('checkinRetryBtn').style.display = web.phase === 'error' ? 'inline-flex' : 'none';
+    big.textContent = web.phase === 'ready' ? '' : info.text;
+  } else {
+    st.style.display = 'none';
+    big.textContent = '';
+  }
+
+  // Keep the fullscreen QR overlay in sync too (harmless if it isn't open right now),
+  // so the count on the projector screen updates live as people check in.
+  el('checkinUrlTextBig').textContent = s.url || '';
+  el('checkinCountBig').textContent = t('checkinCountText', s.count||0);
+}
+
+function renderCheckinFieldsList(){
+  const container = el('checkinFieldsList');
+  if(!container) return;
+  container.innerHTML = state.checkinFields.map(f=>`
+    <div class="checkin-field-item" data-key="${escapeHtml(f.key)}">
+      <span class="cfi-label">${escapeHtml(f.label)}</span>
+      ${f.required ? `<span class="cfi-required">${escapeHtml(t('labelRequired'))}</span>` : ''}
+      <button type="button" class="cfi-remove" data-remove-key="${escapeHtml(f.key)}" aria-label="Remove field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="width:12px;height:12px;"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+  `).join('');
+}
+
+function slugifyFieldLabel(label){
+  const base = label.trim().toLowerCase().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,'') || 'field';
+  return base + '_' + Math.random().toString(36).slice(2,6);
+}
+
+function renderCheckinTab(){
+  el('checkinUnavailable').style.display = 'none';
+  el('checkinAvailable').style.display = 'flex';
+  el('checkinNewFieldLabel').placeholder = t('newFieldPlaceholder');
+  const domainsInput = el('checkinAllowedDomainsInput');
+  if(document.activeElement !== domainsInput) domainsInput.value = state.checkinAllowedDomains.join(', ');
+  renderCheckinFieldsList();
+  if(webCk) webCk.start();
+  refreshCheckinStatus();
+}
+
+checkinApi.onNewCheckin((data)=>{
+  addCheckinParticipant(data);
+  refreshCheckinStatus(); // re-fetches the real count and updates both the settings tab and the fullscreen overlay
+});
+
+el('checkinOpenToggle').addEventListener('change', (e)=>{
+  state.checkinOpen = e.target.checked;
+  storage.set('dp_checkin_open', state.checkinOpen);
+  checkinApi.setOpen(state.checkinOpen);
+});
+
+el('checkinAllowedDomainsInput').addEventListener('input', (e)=>{
+  state.checkinAllowedDomains = parseAllowedDomains(e.target.value);
+  storage.set('dp_checkin_domains', state.checkinAllowedDomains);
+  syncAllowedDomainsToMain();
+});
+
+let publicUrlTimer = null;
+function commitPublicUrl(final){
+  if(!webCk) return;
+  const raw = el('checkinPublicUrlInput').value;
+  const res = webCk.setPublicUrl(raw);
+  if(!res.ok){ if(final) toast(t('toastCheckinBadUrl'), true); return; }
+  refreshCheckinStatus();
+}
+el('checkinPublicUrlInput').addEventListener('input', ()=>{
+  clearTimeout(publicUrlTimer);
+  publicUrlTimer = setTimeout(()=>commitPublicUrl(false), 500);
+});
+el('checkinPublicUrlInput').addEventListener('change', ()=>{
+  clearTimeout(publicUrlTimer);
+  commitPublicUrl(true);
+});
+el('checkinRetryBtn').addEventListener('click', ()=>{ if(webCk) webCk.restart(); });
+
+el('checkinCopyBtn').addEventListener('click', ()=>{
+  const text = el('checkinUrlText').textContent;
+  if(!text) return;
+  (navigator.clipboard?.writeText(text) || Promise.reject()).then(()=>toast(t('toastCheckinCopied'))).catch(()=>{});
+});
+
+el('checkinFullscreenBtn').addEventListener('click', ()=>{
+  el('checkinOverlayTitle').textContent = state.eventTitle;
+  // show whatever we have immediately so the overlay doesn't flash empty, then refresh for accuracy
+  if(checkinStatusCache){
+    if(checkinStatusCache.qrDataUrl) el('checkinQrImgBig').src = checkinStatusCache.qrDataUrl;
+    el('checkinUrlTextBig').textContent = checkinStatusCache.url || '';
+    el('checkinCountBig').textContent = t('checkinCountText', checkinStatusCache.count||0);
+  }
+  closeDrawer();
+  checkinQrOverlayEl.classList.add('open');
+  refreshCheckinStatus();
+});
+el('checkinCloseFullscreenBtn').addEventListener('click', ()=>{ checkinQrOverlayEl.classList.remove('open'); });
+checkinQrOverlayEl.addEventListener('click', (e)=>{
+  if(e.target===checkinQrOverlayEl || e.target.classList.contains('overlay-bg')) checkinQrOverlayEl.classList.remove('open');
+});
+
+el('checkinAddFieldBtn').addEventListener('click', ()=>{
+  const labelInput = el('checkinNewFieldLabel');
+  const reqInput = el('checkinNewFieldRequired');
+  const label = labelInput.value.trim();
+  if(!label){ toast(t('toastCheckinFieldNeedsLabel'), true); return; }
+  const field = { key: slugifyFieldLabel(label), label, required: reqInput.checked };
+  state.checkinFields = state.checkinFields.concat([field]);
+  storage.set('dp_checkin_fields', state.checkinFields);
+  syncFieldsToMain();
+  renderCheckinFieldsList();
+  labelInput.value=''; reqInput.checked=false;
+});
+el('checkinFieldsList').addEventListener('click', (e)=>{
+  const btn = e.target.closest('[data-remove-key]');
+  if(!btn) return;
+  const key = btn.dataset.removeKey;
+  state.checkinFields = state.checkinFields.filter(f=>f.key!==key);
+  storage.set('dp_checkin_fields', state.checkinFields);
+  syncFieldsToMain();
+  renderCheckinFieldsList();
+});
+
+/* ============================================================
+   19. INIT
+   ============================================================ */
+applyTheme();
+renderAll();
+syncBrandingToMain();
+syncFieldsToMain();
+syncParticipantsToMain();
+syncAllowedDomainsToMain();
+checkinApi.setOpen(state.checkinOpen);
+if(webCk){
+  webCk.onChange = ()=>{ refreshCheckinStatus(); };
+  if(storage.get('dp_checkin_auto', false) && webCk.hasBase()) webCk.start();
+}
+
+})();
+</script>
+</body>
+</html>
