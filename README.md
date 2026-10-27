@@ -2,7 +2,7 @@
 
 Aplikasi undian doorprize satu file (`index.html`) dengan check-in peserta lewat QR.
 
-Alamat publik (GitHub Pages): https://jwccampus-eng.github.io/senayancampus/
+Alamat publik (GitHub Pages dengan domain sendiri): https://jwcfx.io/
 
 ## Cara kerja check-in QR
 
@@ -15,7 +15,10 @@ Catatan:
 - Halaman penyelenggara harus tetap terbuka dan online selama check-in berlangsung. Data dikirim langsung dari HP ke halaman penyelenggara (WebRTC lewat PeerJS), tidak disimpan di server.
 - Daftar peserta tersimpan di browser penyelenggara. Gunakan **Export participants (CSV)** untuk cadangan.
 - Email yang sama tidak bisa check-in dua kali. Anda bisa membatasi domain email (misalnya `.edu` atau `binus.ac.id`) di tab Check-in.
+- Selalu buka aplikasi dari satu alamat yang sama selama acara (`https://jwcfx.io/`). Daftar peserta tersimpan per alamat, jadi membuka dari alamat lain akan terlihat kosong.
 
 ## Mengaktifkan GitHub Pages
 
 Repo → **Settings → Pages → Build and deployment** → Source: *Deploy from a branch* → Branch: `main` / `(root)` → **Save**. Tunggu 1–2 menit sampai alamat publik aktif.
+
+Domain sendiri diatur di **Settings → Pages → Custom domain** (file `CNAME` dibuat otomatis oleh GitHub, jangan dihapus). Setelah pengecekan DNS selesai, centang **Enforce HTTPS** supaya HP membuka situs lewat `https://`.

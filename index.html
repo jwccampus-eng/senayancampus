@@ -1012,7 +1012,7 @@ html.is-fullscreen .topbar-actions{
           <div class="field" id="checkinWebSetup" style="display:none;">
             <label for="checkinPublicUrlInput" data-i18n="labelPublicUrl">Public link of this page</label>
             <span class="help" data-i18n="labelPublicUrlHelp">Phones can't open a file saved on this computer. Upload this HTML file to a free web host, then paste its link here.</span>
-            <input type="text" id="checkinPublicUrlInput" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://jwccampus-eng.github.io/senayancampus/">
+            <input type="text" id="checkinPublicUrlInput" inputmode="url" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="https://jwcfx.io/">
           </div>
 
           <div class="checkin-qr-wrap">
@@ -3001,11 +3001,11 @@ const QR = (function(){
 
 function createWebCheckin(env){
   const LS_PEER = 'dp_checkin_peer', LS_URL = 'dp_checkin_public_url';
-  /* Public address of this page on GitHub Pages (repo: jwccampus-eng/senayancampus).
+  /* Public address of this page (GitHub Pages custom domain, repo: jwccampus-eng/senayancampus).
      Phones open this address when they scan the QR. It is used when this page is opened
      from a file on the computer, so the QR works even without pasting a link first.
      If the page is already opened from its public address, that address is used instead. */
-  const DEFAULT_PUBLIC_URL = 'https://jwccampus-eng.github.io/senayancampus/';
+  const DEFAULT_PUBLIC_URL = 'https://jwcfx.io/';
   const S = {
     peer:null, phase:'idle', error:'', tries:0, retryTimer:null,
     open:true, fields:[], domains:[], brand:{ title:'', lang:'en', logo:null },
