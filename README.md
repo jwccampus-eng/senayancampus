@@ -2,7 +2,7 @@
 
 Aplikasi undian doorprize satu file (`index.html`) dengan check-in peserta lewat QR.
 
-Alamat publik (GitHub Pages): https://jwccampus-eng.github.io/senayancampus/
+Alamat publik (GitHub Pages): [https://jwccampus-eng.github.io/senayancampus/](https://jwccampus-eng.github.io/senayancampus/?v=4)
 
 ## Cara kerja check-in QR
 
